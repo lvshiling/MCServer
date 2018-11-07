@@ -6,11 +6,12 @@
 #include "../Root.h"
 #include "../Server.h"
 #include "../ClientHandle.h"
+#include "../UUID.h"
 
 #include "../IniFile.h"
 #include "json/json.h"
 
-#include "PolarSSL++/BlockingSslClientSocket.h"
+#include "../mbedTLS++/BlockingSslClientSocket.h"
 
 
 
@@ -76,7 +77,6 @@ void cAuthenticator::Authenticate(int a_ClientID, const AString & a_UserName, co
 void cAuthenticator::Start(cSettingsRepositoryInterface & a_Settings)
 {
 	ReadSettings(a_Settings);
-	m_ShouldTerminate = false;
 	super::Start();
 }
 
@@ -88,7 +88,7 @@ void cAuthenticator::Stop(void)
 {
 	m_ShouldTerminate = true;
 	m_QueueNonempty.Set();
-	Wait();
+	super::Stop();
 }
 
 
@@ -119,11 +119,11 @@ void cAuthenticator::Execute(void)
 		Lock.Unlock();
 
 		AString NewUserName = UserName;
-		AString UUID;
+		cUUID UUID;
 		Json::Value Properties;
 		if (AuthWithYggdrasil(NewUserName, ServerID, UUID, Properties))
 		{
-			LOGINFO("User %s authenticated with UUID %s", NewUserName.c_str(), UUID.c_str());
+			LOGINFO("User %s authenticated with UUID %s", NewUserName.c_str(), UUID.ToShortString().c_str());
 			cRoot::Get()->AuthenticateUser(ClientID, NewUserName, UUID, Properties);
 		}
 		else
@@ -137,7 +137,7 @@ void cAuthenticator::Execute(void)
 
 
 
-bool cAuthenticator::AuthWithYggdrasil(AString & a_UserName, const AString & a_ServerId, AString & a_UUID, Json::Value & a_Properties)
+bool cAuthenticator::AuthWithYggdrasil(AString & a_UserName, const AString & a_ServerId, cUUID & a_UUID, Json::Value & a_Properties)
 {
 	LOGD("Trying to authenticate user %s", a_UserName.c_str());
 
@@ -149,7 +149,7 @@ bool cAuthenticator::AuthWithYggdrasil(AString & a_UserName, const AString & a_S
 	AString Request;
 	Request += "GET " + ActualAddress + " HTTP/1.0\r\n";
 	Request += "Host: " + m_Server + "\r\n";
-	Request += "User-Agent: MCServer\r\n";
+	Request += "User-Agent: Cuberite\r\n";
 	Request += "Connection: close\r\n";
 	Request += "\r\n";
 
@@ -192,9 +192,13 @@ bool cAuthenticator::AuthWithYggdrasil(AString & a_UserName, const AString & a_S
 		return false;
 	}
 	a_UserName = root.get("name", "Unknown").asString();
-	a_UUID = cMojangAPI::MakeUUIDShort(root.get("id", "").asString());
 	a_Properties = root["properties"];
-	
+	if (!a_UUID.FromString(root.get("id", "").asString()))
+	{
+		LOGWARNING("cAuthenticator: Recieved invalid UUID format");
+		return false;
+	}
+
 	// Store the player's profile in the MojangAPI caches:
 	cRoot::Get()->GetMojangAPI().AddPlayerProfile(a_UserName, a_UUID, a_Properties);
 
@@ -223,7 +227,7 @@ bool cAuthenticator::GetPlayerProperties(const AString & a_UUID, Json::Value & a
 	AString Request;
 	Request += "GET " + ActualAddress + " HTTP/1.0\r\n";
 	Request += "Host: " + m_Server + "\r\n";
-	Request += "User-Agent: MCServer\r\n";
+	Request += "User-Agent: Cuberite\r\n";
 	Request += "Connection: close\r\n";
 	Request += "\r\n";
 

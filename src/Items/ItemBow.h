@@ -1,15 +1,8 @@
 
-// ItemBow.h
-
-// Declares the cItemBowHandler class representing the itemhandler for bows
-
-
-
-
-
 #pragma once
 
 #include "../Entities/ArrowEntity.h"
+#include "ItemHandler.h"
 
 
 
@@ -19,22 +12,22 @@ class cItemBowHandler :
 	public cItemHandler
 {
 	typedef cItemHandler super;
-	
+
 public:
 	cItemBowHandler(void) :
 		super(E_ITEM_BOW)
 	{
 	}
-	
 
-	
+
+
 	virtual bool OnItemUse(
 		cWorld * a_World, cPlayer * a_Player, cBlockPluginInterface & a_PluginInterface, const cItem & a_Item,
 		int a_BlockX, int a_BlockY, int a_BlockZ, eBlockFace a_BlockFace
 	) override
 	{
 		ASSERT(a_Player != nullptr);
-		
+
 		// Check if the player has an arrow in the inventory, or is in Creative:
 		if (!(a_Player->IsGameModeCreative() || a_Player->GetInventory().HasItems(cItem(E_ITEM_ARROW))))
 		{
@@ -45,8 +38,8 @@ public:
 		return true;
 	}
 
-	
-	
+
+
 	virtual void OnItemShoot(cPlayer * a_Player, int a_BlockX, int a_BlockY, int a_BlockZ, eBlockFace a_BlockFace) override
 	{
 		// Actual shot - produce the arrow with speed based on the ticks that the bow was charged
@@ -69,22 +62,15 @@ public:
 		}
 
 		// Create the arrow entity:
-		cArrowEntity * Arrow = new cArrowEntity(*a_Player, Force * 2);
-		if (Arrow == nullptr)
+		auto Arrow = cpp14::make_unique<cArrowEntity>(*a_Player, Force * 2);
+		auto ArrowPtr = Arrow.get();
+		if (!ArrowPtr->Initialize(std::move(Arrow), *a_Player->GetWorld()))
 		{
-			return;
-		}
-		if (!Arrow->Initialize(*a_Player->GetWorld()))
-		{
-			delete Arrow;
-			Arrow = nullptr;
 			return;
 		}
 		a_Player->GetWorld()->BroadcastSoundEffect(
-			"random.bow",
-			a_Player->GetPosX(),
-			a_Player->GetPosY(),
-			a_Player->GetPosZ(),
+			"entity.arrow.shoot",
+			a_Player->GetPosition(),
 			0.5,
 			static_cast<float>(Force)
 		);
@@ -96,21 +82,15 @@ public:
 			}
 			else
 			{
-				Arrow->SetPickupState(cArrowEntity::psNoPickup);
+				ArrowPtr->SetPickupState(cArrowEntity::psNoPickup);
 			}
-			
 
 			a_Player->UseEquippedItem();
 		}
 
 		if (a_Player->GetEquippedItem().m_Enchantments.GetLevel(cEnchantments::enchFlame) > 0)
 		{
-			Arrow->StartBurning(100);
+			ArrowPtr->StartBurning(100);
 		}
 	}
 } ;
-
-
-
-
-

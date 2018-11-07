@@ -22,7 +22,7 @@ cMapManager::cMapManager(cWorld * a_World)
 
 
 
-bool cMapManager::DoWithMap(UInt32 a_ID, cMapCallback & a_Callback)
+bool cMapManager::DoWithMap(UInt32 a_ID, cMapCallback a_Callback)
 {
 	cCSLock Lock(m_CS);
 	cMap * Map = GetMapData(a_ID);
@@ -33,7 +33,7 @@ bool cMapManager::DoWithMap(UInt32 a_ID, cMapCallback & a_Callback)
 	}
 	else
 	{
-		a_Callback.Item(Map);
+		a_Callback(*Map);
 		return true;
 	}
 }
@@ -42,18 +42,13 @@ bool cMapManager::DoWithMap(UInt32 a_ID, cMapCallback & a_Callback)
 
 
 
-bool cMapManager::ForEachMap(cMapCallback & a_Callback)
+void cMapManager::TickMaps()
 {
 	cCSLock Lock(m_CS);
-	for (cMapList::iterator itr = m_MapData.begin(); itr != m_MapData.end(); ++itr)
+	for (auto & Map : m_MapData)
 	{
-		cMap * Map = &(*itr);
-		if (a_Callback.Item(Map))
-		{
-			return false;
-		}
-	}  // for itr - m_MapData[]
-	return true;
+		Map.Tick();
+	}
 }
 
 
@@ -97,20 +92,11 @@ cMap * cMapManager::CreateMap(int a_CenterX, int a_CenterY, unsigned int a_Scale
 
 
 
-size_t cMapManager::GetNumMaps(void) const
-{
-	return m_MapData.size();
-}
-
-
-
-
-
 void cMapManager::LoadMapData(void)
 {
 	cCSLock Lock(m_CS);
 
-	cIDCountSerializer IDSerializer(m_World->GetName());
+	cIDCountSerializer IDSerializer(m_World->GetDataPath());
 
 	if (!IDSerializer.Load())
 	{
@@ -125,7 +111,7 @@ void cMapManager::LoadMapData(void)
 	{
 		cMap Map(i, m_World);
 
-		cMapSerializer Serializer(m_World->GetName(), &Map);
+		cMapSerializer Serializer(m_World->GetDataPath(), &Map);
 
 		if (!Serializer.Load())
 		{
@@ -149,7 +135,7 @@ void cMapManager::SaveMapData(void)
 		return;
 	}
 
-	cIDCountSerializer IDSerializer(m_World->GetName());
+	cIDCountSerializer IDSerializer(m_World->GetDataPath());
 
 	IDSerializer.SetMapCount(static_cast<unsigned>(m_MapData.size()));
 
@@ -163,7 +149,7 @@ void cMapManager::SaveMapData(void)
 	{
 		cMap & Map = *it;
 
-		cMapSerializer Serializer(m_World->GetName(), &Map);
+		cMapSerializer Serializer(m_World->GetDataPath(), &Map);
 
 		if (!Serializer.Save())
 		{

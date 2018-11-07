@@ -20,22 +20,28 @@ public:
 		cMetaRotator<cBlockEntityHandler, 0x07, 0x02, 0x05, 0x03, 0x04>(a_BlockType)
 	{
 	}
-	
 
 	virtual bool GetPlacementBlockTypeMeta(
-		cChunkInterface & a_ChunkInterface, cPlayer * a_Player,
+		cChunkInterface & a_ChunkInterface, cPlayer & a_Player,
 		int a_BlockX, int a_BlockY, int a_BlockZ, eBlockFace a_BlockFace,
 		int a_CursorX, int a_CursorY, int a_CursorZ,
 		BLOCKTYPE & a_BlockType, NIBBLETYPE & a_BlockMeta
 	) override
 	{
 		a_BlockType = m_BlockType;
-		
+
 		// FIXME: Do not use cPiston class for dispenser placement!
-		a_BlockMeta = cBlockPistonHandler::RotationPitchToMetaData(a_Player->GetYaw(), a_Player->GetPitch());
+		a_BlockMeta = cBlockPistonHandler::RotationPitchToMetaData(a_Player.GetYaw(), a_Player.GetPitch());
 		return true;
 	}
-	
+
+	/** Called when the drop / dispenser is convert into pickup, ignore meta data */
+	virtual void ConvertToPickups(cItems & a_Pickups, NIBBLETYPE a_BlockMeta) override
+	{
+		UNUSED(a_BlockMeta);
+		a_Pickups.push_back(cItem(m_BlockType, 1));
+	}
+
 	virtual NIBBLETYPE MetaMirrorXZ(NIBBLETYPE a_Meta) override
 	{
 		// Bit 0x08 is a flag. Lowest three bits are position. 0x08 == 1000
@@ -48,6 +54,12 @@ public:
 		}
 		// Not Facing Up or Down; No change.
 		return a_Meta;
+	}
+
+	virtual ColourID GetMapBaseColourID(NIBBLETYPE a_Meta) override
+	{
+		UNUSED(a_Meta);
+		return 11;
 	}
 } ;
 

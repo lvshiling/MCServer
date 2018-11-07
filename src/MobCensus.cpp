@@ -48,6 +48,7 @@ int cMobCensus::GetCapMultiplier(cMonster::eFamily a_MobFamily)
 			return -1;
 		}
 	}
+	UNREACHABLE("Unsupported mob family");
 }
 
 

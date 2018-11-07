@@ -17,7 +17,7 @@ public:
 	}
 
 	virtual bool GetPlacementBlockTypeMeta(
-		cChunkInterface & a_ChunkInterface, cPlayer * a_Player,
+		cChunkInterface & a_ChunkInterface, cPlayer & a_Player,
 		int a_BlockX, int a_BlockY, int a_BlockZ, eBlockFace a_BlockFace,
 		int a_CursorX, int a_CursorY, int a_CursorZ,
 		BLOCKTYPE & a_BlockType, NIBBLETYPE & a_BlockMeta
@@ -45,6 +45,7 @@ public:
 				return 0x0;
 			}
 		}
+		UNREACHABLE("Unsupported block face");
 	}
 
 	inline static eBlockFace MetadataToDirection(NIBBLETYPE a_Meta)
@@ -75,6 +76,12 @@ public:
 		a_Chunk.UnboundedRelGetBlockType(a_RelX, a_RelY, a_RelZ, BlockIsOn);
 
 		return ((a_RelY > 0) && cBlockInfo::FullyOccupiesVoxel(BlockIsOn));
+	}
+
+	virtual ColourID GetMapBaseColourID(NIBBLETYPE a_Meta) override
+	{
+		UNUSED(a_Meta);
+		return 0;
 	}
 };
 

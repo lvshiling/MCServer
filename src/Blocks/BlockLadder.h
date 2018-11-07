@@ -2,7 +2,6 @@
 #pragma once
 
 #include "BlockHandler.h"
-#include "../World.h"
 #include "ClearMetaOnDrop.h"
 
 
@@ -19,9 +18,8 @@ public:
 	{
 	}
 
-
 	virtual bool GetPlacementBlockTypeMeta(
-		cChunkInterface & a_ChunkInterface, cPlayer * a_Player,
+		cChunkInterface & a_ChunkInterface, cPlayer & a_Player,
 		int a_BlockX, int a_BlockY, int a_BlockZ, eBlockFace a_BlockFace,
 		int a_CursorX, int a_CursorY, int a_CursorZ,
 		BLOCKTYPE & a_BlockType, NIBBLETYPE & a_BlockMeta
@@ -30,7 +28,7 @@ public:
 		if (!LadderCanBePlacedAt(a_ChunkInterface, a_BlockX, a_BlockY, a_BlockZ, a_BlockFace))
 		{
 			a_BlockFace = FindSuitableBlockFace(a_ChunkInterface, a_BlockX, a_BlockY, a_BlockZ);
-			
+
 			if (a_BlockFace == BLOCK_FACE_BOTTOM)
 			{
 				return false;
@@ -42,12 +40,10 @@ public:
 		return true;
 	}
 
-
 	virtual void ConvertToPickups(cItems & a_Pickups, NIBBLETYPE a_BlockMeta) override
 	{
 		a_Pickups.Add(m_BlockType, 1, 0);  // Reset meta
 	}
-
 
 	static NIBBLETYPE DirectionToMetaData(eBlockFace a_Direction)
 	{
@@ -64,8 +60,8 @@ public:
 				return 0x2;
 			}
 		}
+		UNREACHABLE("Unsupported block face");
 	}
-
 
 	static eBlockFace MetaDataToDirection(NIBBLETYPE a_MetaData)
 	{
@@ -78,7 +74,6 @@ public:
 			default:  return BLOCK_FACE_ZM;
 		}
 	}
-
 
 	/** Finds a suitable Direction for the Ladder. Returns BLOCK_FACE_BOTTOM on failure */
 	static eBlockFace FindSuitableBlockFace(cChunkInterface & a_ChunkInterface, int a_BlockX, int a_BlockY, int a_BlockZ)
@@ -93,7 +88,6 @@ public:
 		}
 		return BLOCK_FACE_BOTTOM;
 	}
-	
 
 	static bool LadderCanBePlacedAt(cChunkInterface & a_ChunkInterface, int a_BlockX, int a_BlockY, int a_BlockZ, eBlockFace a_BlockFace)
 	{
@@ -104,9 +98,8 @@ public:
 
 		AddFaceDirection( a_BlockX, a_BlockY, a_BlockZ, a_BlockFace, true);
 
-		return cBlockInfo::IsSolid(a_ChunkInterface.GetBlock(a_BlockX, a_BlockY, a_BlockZ));
+		return cBlockInfo::IsSolid(a_ChunkInterface.GetBlock({a_BlockX, a_BlockY, a_BlockZ}));
 	}
-
 
 	virtual bool CanBeAt(cChunkInterface & a_ChunkInterface, int a_RelX, int a_RelY, int a_RelZ, const cChunk & a_Chunk) override
 	{
@@ -115,6 +108,12 @@ public:
 		int BlockX = a_RelX + a_Chunk.GetPosX() * cChunkDef::Width;
 		int BlockZ = a_RelZ + a_Chunk.GetPosZ() * cChunkDef::Width;
 		return LadderCanBePlacedAt(a_ChunkInterface, BlockX, a_RelY, BlockZ, BlockFace);
+	}
+
+	virtual ColourID GetMapBaseColourID(NIBBLETYPE a_Meta) override
+	{
+		UNUSED(a_Meta);
+		return 0;
 	}
 } ;
 

@@ -6,48 +6,17 @@
 #include "Globals.h"  // NOTE: MSVC stupidness requires this to be the same across all modules
 #include "FlowerPotEntity.h"
 #include "../Entities/Player.h"
+#include "../ClientHandle.h"
 #include "../Item.h"
 
 
 
 
 
-cFlowerPotEntity::cFlowerPotEntity(int a_BlockX, int a_BlockY, int a_BlockZ, cWorld * a_World) :
-	super(E_BLOCK_FLOWER_POT, a_BlockX, a_BlockY, a_BlockZ, a_World)
+cFlowerPotEntity::cFlowerPotEntity(BLOCKTYPE a_BlockType, NIBBLETYPE a_BlockMeta, int a_BlockX, int a_BlockY, int a_BlockZ, cWorld * a_World):
+	Super(a_BlockType, a_BlockMeta, a_BlockX, a_BlockY, a_BlockZ, a_World)
 {
-}
-
-
-
-
-
-// It don't do anything when 'used'
-void cFlowerPotEntity::UsedBy(cPlayer * a_Player)
-{
-	if (IsItemInPot())
-	{
-		return;
-	}
-
-	cItem SelectedItem = a_Player->GetInventory().GetEquippedItem();
-	if (IsFlower(SelectedItem.m_ItemType, SelectedItem.m_ItemDamage))
-	{
-		m_Item = SelectedItem.CopyOne();
-		if (!a_Player->IsGameModeCreative())
-		{
-			a_Player->GetInventory().RemoveOneEquippedItem();
-		}
-		m_World->BroadcastBlockEntity(m_PosX, m_PosY, m_PosZ, a_Player->GetClientHandle());
-	}
-}
-
-
-
-
-
-void cFlowerPotEntity::SendTo(cClientHandle & a_Client)
-{
-	a_Client.SendUpdateBlockEntity(*this);
+	ASSERT(a_BlockType == E_BLOCK_FLOWER_POT);
 }
 
 
@@ -66,6 +35,50 @@ void cFlowerPotEntity::Destroy(void)
 
 		m_Item.Empty();
 	}
+}
+
+
+
+
+
+void cFlowerPotEntity::CopyFrom(const cBlockEntity & a_Src)
+{
+	Super::CopyFrom(a_Src);
+	auto & src = static_cast<const cFlowerPotEntity &>(a_Src);
+	m_Item = src.m_Item;
+}
+
+
+
+
+
+bool cFlowerPotEntity::UsedBy(cPlayer * a_Player)
+{
+	if (IsItemInPot())
+	{
+		return false;
+	}
+
+	cItem SelectedItem = a_Player->GetInventory().GetEquippedItem();
+	if (IsFlower(SelectedItem.m_ItemType, SelectedItem.m_ItemDamage))
+	{
+		m_Item = SelectedItem.CopyOne();
+		if (!a_Player->IsGameModeCreative())
+		{
+			a_Player->GetInventory().RemoveOneEquippedItem();
+		}
+		m_World->BroadcastBlockEntity(GetPos(), a_Player->GetClientHandle());
+	}
+	return true;
+}
+
+
+
+
+
+void cFlowerPotEntity::SendTo(cClientHandle & a_Client)
+{
+	a_Client.SendUpdateBlockEntity(*this);
 }
 
 

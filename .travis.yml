@@ -1,28 +1,68 @@
 language: cpp
+sudo: false
 
-compiler: 
-- clang
-- gcc
+# Use Linux by default
+os: linux
 
-before_install:
-  - sudo add-apt-repository -y ppa:ubuntu-toolchain-r/test
-  - sudo apt-get update -qq
-
-install:
-  - sudo apt-get install -qq g++-4.8
-  - sudo update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-4.8 90
-  - sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-4.8 90
-
-  # lua, needed for style checking and possibly later on for bindings generation
-  - sudo apt-get install -qq lua5.1
+matrix:
+  include:
+    # AppleClang
+    # OSX workers are slower to start up.  Having these first in the build matrix makes travis faster overall.
+    - os: osx
+      compiler: clang
+      env: &Release
+        - TRAVIS_CUBERITE_BUILD_TYPE=RELEASE CUBERITE_PATH=./Cuberite
+    - os: osx
+      compiler: clang
+      env: &Debug
+        - TRAVIS_CUBERITE_BUILD_TYPE=DEBUG CUBERITE_PATH=./Cuberite_debug
+    # Default clang
+    - compiler: clang
+      env: *Release
+    - compiler: clang
+      env: *Debug
+    # clang 3.5
+    - compiler: clang
+      addons: &clang35
+        apt:
+          sources:
+            - llvm-toolchain-precise-3.5
+          packages:
+            - clang++-3.5
+            - clang-3.5
+      before_install:
+        - CC=clang-3.5;CXX=clang++-3.5
+      env: *Release
+    - compiler: clang
+      addons: *clang35
+      before_install:
+        - CC=clang-3.5;CXX=clang++-3.5
+      env: *Debug
+    # gcc 4.8
+    - compiler: gcc
+      addons: &gcc48
+        apt:
+          sources:
+            - ubuntu-toolchain-r-test
+          packages:
+            - g++-4.8
+            - gcc-4.8
+      before_install:
+        - CC=gcc-4.8;CXX=g++-4.8
+      env: *Release
+    - compiler: gcc
+      addons: *gcc48
+      before_install:
+        - CC=gcc-4.8;CXX=g++-4.8
+      env: *Debug
 
 script: ./CIbuild.sh
-
-env:
-  - TRAVIS_MCSERVER_BUILD_TYPE=RELEASE MCSERVER_PATH=./MCServer
-  - TRAVIS_MCSERVER_BUILD_TYPE=DEBUG   MCSERVER_PATH=./MCServer_debug
 
 notifications:
   email:
     on_success: change
     on_failure: always
+branches:
+  only:
+    - coverity_scan
+    - master

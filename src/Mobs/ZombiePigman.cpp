@@ -2,13 +2,14 @@
 
 #include "ZombiePigman.h"
 #include "../World.h"
+#include "../ClientHandle.h"
 
 
 
 
 
 cZombiePigman::cZombiePigman(void) :
-	super("ZombiePigman", mtZombiePigman, "mob.zombiepig.zpighurt", "mob.zombiepig.zpigdeath", 0.6, 1.8)
+	super("ZombiePigman", mtZombiePigman, "entity.zombie_pig.hurt", "entity.zombie_pig.death", 0.6, 1.8)
 {
 }
 
@@ -25,12 +26,22 @@ void cZombiePigman::GetDrops(cItems & a_Drops, cEntity * a_Killer)
 	}
 	AddRandomDropItem(a_Drops, 0, 1 + LootingLevel, E_ITEM_ROTTEN_FLESH);
 	AddRandomDropItem(a_Drops, 0, 1 + LootingLevel, E_ITEM_GOLD_NUGGET);
-	
+
 	cItems RareDrops;
 	RareDrops.Add(cItem(E_ITEM_GOLD));
 	AddRandomRareDropItem(a_Drops, RareDrops, LootingLevel);
 	AddRandomArmorDropItem(a_Drops, LootingLevel);
 	AddRandomWeaponDropItem(a_Drops, LootingLevel);
+}
+
+
+
+
+
+void cZombiePigman::SpawnOn(cClientHandle & a_ClientHandle)
+{
+		super::SpawnOn(a_ClientHandle);
+		a_ClientHandle.SendEntityEquipment(*this, 0, cItem(E_ITEM_GOLD_SWORD));
 }
 
 

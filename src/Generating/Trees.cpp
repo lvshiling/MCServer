@@ -5,7 +5,7 @@
 
 #include "Globals.h"
 #include "Trees.h"
-#include "../BlockID.h"
+#include "../World.h"
 
 
 
@@ -94,7 +94,7 @@ static const sCoordsArr BigOs[] =
 
 
 
-/// Pushes a specified layer of blocks of the same type around (x, h, z) into a_Blocks
+/** Pushes a specified layer of blocks of the same type around (x, h, z) into a_Blocks */
 inline void PushCoordBlocks(int a_BlockX, int a_Height, int a_BlockZ, sSetBlockVector & a_Blocks, const sCoords * a_Coords, size_t a_NumCoords, BLOCKTYPE a_BlockType, NIBBLETYPE a_Meta)
 {
 	for (size_t i = 0; i < a_NumCoords; i++)
@@ -170,7 +170,7 @@ void GetTreeImageByBiome(int a_BlockX, int a_BlockY, int a_BlockZ, cNoise & a_No
 			}
 			return;
 		}
-		
+
 		case biTaiga:
 		case biIcePlains:
 		case biIceMountains:
@@ -180,7 +180,7 @@ void GetTreeImageByBiome(int a_BlockX, int a_BlockY, int a_BlockZ, cNoise & a_No
 			GetConiferTreeImage(a_BlockX, a_BlockY, a_BlockZ, a_Noise, a_Seq, a_LogBlocks, a_OtherBlocks);
 			return;
 		}
-		
+
 		case biSwamplandM:
 		case biSwampland:
 		{
@@ -188,7 +188,7 @@ void GetTreeImageByBiome(int a_BlockX, int a_BlockY, int a_BlockZ, cNoise & a_No
 			GetSwampTreeImage(a_BlockX, a_BlockY, a_BlockZ, a_Noise, a_Seq, a_LogBlocks, a_OtherBlocks);
 			return;
 		}
-		
+
 		case biJungle:
 		case biJungleHills:
 		case biJungleEdge:
@@ -200,11 +200,12 @@ void GetTreeImageByBiome(int a_BlockX, int a_BlockY, int a_BlockZ, cNoise & a_No
 			}
 			else
 			{
-				GetJungleTreeImage(a_BlockX, a_BlockY, a_BlockZ, a_Noise, a_Seq, a_LogBlocks, a_OtherBlocks);
+				bool IsLarge = a_Noise.IntNoise3DInt(a_BlockX + 32 * a_Seq, a_BlockY + 32 * a_Seq, a_BlockZ) < 0x60000000;
+				GetJungleTreeImage(a_BlockX, a_BlockY, a_BlockZ, a_Noise, a_Seq, a_LogBlocks, a_OtherBlocks, IsLarge);
 			}
 			return;
 		}
-		
+
 		case biBirchForest:
 		case biBirchForestHills:
 		{
@@ -257,7 +258,7 @@ void GetTreeImageByBiome(int a_BlockX, int a_BlockY, int a_BlockZ, cNoise & a_No
 			GetDarkoakTreeImage(a_BlockX, a_BlockY, a_BlockZ, a_Noise, a_Seq, a_LogBlocks, a_OtherBlocks);
 			return;
 		}
-			
+
 		case biMesa:
 		case biMesaPlateauF:
 		case biMesaPlateau:
@@ -286,7 +287,7 @@ void GetTreeImageByBiome(int a_BlockX, int a_BlockY, int a_BlockZ, cNoise & a_No
 			return;
 		}
 	}
-	
+
 	ASSERT(!"Invalid biome type!");
 }
 
@@ -318,24 +319,24 @@ void GetSmallAppleTreeImage(int a_BlockX, int a_BlockY, int a_BlockZ, cNoise & a
 	- 2 layers of BigO2 + random corners (log)
 	- 1 to 3 blocks of trunk
 	*/
-	
+
 	int Random = a_Noise.IntNoise3DInt(a_BlockX + 64 * a_Seq, a_BlockY, a_BlockZ) >> 3;
-	
+
 	HEIGHTTYPE Heights[] = {1, 2, 2, 3} ;
 	HEIGHTTYPE Height = 1 + Heights[Random & 3];
 	Random >>= 2;
-	
+
 	// Pre-alloc so that we don't realloc too often later:
 	a_LogBlocks.reserve(static_cast<size_t>(Height + 5));
 	a_OtherBlocks.reserve(ARRAYCOUNT(BigO2) * 2 + ARRAYCOUNT(BigO1) + ARRAYCOUNT(Corners) * 3 + 3 + 5);
-	
+
 	// Trunk:
 	for (int i = 0; i < Height; i++)
 	{
 		a_LogBlocks.push_back(sSetBlock(a_BlockX, a_BlockY + i, a_BlockZ, E_BLOCK_LOG, E_META_LOG_APPLE));
 	}
 	int Hei = a_BlockY + Height;
-	
+
 	// 2 BigO2 + corners layers:
 	for (int i = 0; i < 2; i++)
 	{
@@ -344,7 +345,7 @@ void GetSmallAppleTreeImage(int a_BlockX, int a_BlockY, int a_BlockZ, cNoise & a
 		a_LogBlocks.push_back(sSetBlock(a_BlockX, Hei, a_BlockZ, E_BLOCK_LOG, E_META_LOG_APPLE));
 		Hei++;
 	}  // for i - 2*
-	
+
 	// Optional BigO1 + corners layer:
 	if ((Random & 1) == 0)
 	{
@@ -353,7 +354,7 @@ void GetSmallAppleTreeImage(int a_BlockX, int a_BlockY, int a_BlockZ, cNoise & a
 		a_LogBlocks.push_back(sSetBlock(a_BlockX, Hei, a_BlockZ, E_BLOCK_LOG, E_META_LOG_APPLE));
 		Hei++;
 	}
-	
+
 	// Top plus:
 	PushCoordBlocks(a_BlockX, Hei, a_BlockZ, a_OtherBlocks, BigO1, ARRAYCOUNT(BigO1), E_BLOCK_LEAVES, E_META_LEAVES_APPLE);
 	a_OtherBlocks.push_back(sSetBlock(a_BlockX, Hei, a_BlockZ, E_BLOCK_LEAVES, E_META_LEAVES_APPLE));
@@ -443,7 +444,7 @@ void GetLargeAppleTreeBranch(int a_BlockX, int a_BlockY, int a_BlockZ, int a_Bra
 			return;
 		}
 		Direction -= a_Direction;
-		Direction.clamp(-1.0, 1.0);
+		Direction.Clamp(-1.0, 1.0);
 		a_LogBlocks.push_back(sSetBlock(FloorC(CurrentPos.x), FloorC(CurrentPos.y), FloorC(CurrentPos.z), E_BLOCK_LOG, GetLogMetaFromDirection(E_META_LOG_APPLE, Direction)));
 	}
 }
@@ -454,7 +455,7 @@ void GetLargeAppleTreeBranch(int a_BlockX, int a_BlockY, int a_BlockZ, int a_Bra
 
 NIBBLETYPE GetLogMetaFromDirection(NIBBLETYPE a_BlockMeta, Vector3d a_Direction)
 {
-	a_Direction.abs();
+	a_Direction.Abs();
 
 	if ((a_Direction.y > a_Direction.x) && (a_Direction.y > a_Direction.z))
 	{
@@ -477,28 +478,28 @@ NIBBLETYPE GetLogMetaFromDirection(NIBBLETYPE a_BlockMeta, Vector3d a_Direction)
 void GetBirchTreeImage(int a_BlockX, int a_BlockY, int a_BlockZ, cNoise & a_Noise, int a_Seq, sSetBlockVector & a_LogBlocks, sSetBlockVector & a_OtherBlocks)
 {
 	HEIGHTTYPE Height = 5 + (a_Noise.IntNoise3DInt(a_BlockX + 64 * a_Seq, a_BlockY, a_BlockZ) % 3);
-	
+
 	// Prealloc, so that we don't realloc too often later:
 	a_LogBlocks.reserve(static_cast<size_t>(Height));
 	a_OtherBlocks.reserve(80);
-	
+
 	// The entire trunk, out of logs:
 	for (int i = Height - 1; i >= 0; --i)
 	{
 		a_LogBlocks.push_back(sSetBlock(a_BlockX, a_BlockY + i, a_BlockZ, E_BLOCK_LOG, E_META_LOG_BIRCH));
 	}
 	int h = a_BlockY + Height;
-	
+
 	// Top layer - just the Plus:
 	PushCoordBlocks(a_BlockX, h, a_BlockZ, a_OtherBlocks, BigO1, ARRAYCOUNT(BigO1), E_BLOCK_LEAVES, E_META_LEAVES_BIRCH);
 	a_OtherBlocks.push_back(sSetBlock(a_BlockX, h, a_BlockZ, E_BLOCK_LEAVES, E_META_LEAVES_BIRCH));  // There's no log at this layer
 	h--;
-	
+
 	// Second layer - log, Plus and maybe Corners:
 	PushCoordBlocks (a_BlockX, h, a_BlockZ, a_OtherBlocks, BigO1, ARRAYCOUNT(BigO1), E_BLOCK_LEAVES, E_META_LEAVES_BIRCH);
 	PushCornerBlocks(a_BlockX, h, a_BlockZ, a_Seq, a_Noise, 0x5fffffff, a_OtherBlocks, 1, E_BLOCK_LEAVES, E_META_LEAVES_BIRCH);
 	h--;
-	
+
 	// Third and fourth layers - BigO2 and maybe 2 * Corners:
 	for (int Row = 0; Row < 2; Row++)
 	{
@@ -516,7 +517,7 @@ void GetAcaciaTreeImage(int a_BlockX, int a_BlockY, int a_BlockZ, cNoise & a_Noi
 {
 	// Calculate a base height
 	int Height = 2 + (a_Noise.IntNoise3DInt(a_BlockX, a_BlockY, a_BlockZ) / 11 % 3);
-	
+
 	// Create the trunk
 	for (int i = 0; i < Height; i++)
 	{
@@ -549,9 +550,9 @@ void GetAcaciaTreeImage(int a_BlockX, int a_BlockY, int a_BlockZ, cNoise & a_Noi
 	}
 
 	// Add the leaves to the top of the branch
-	PushCoordBlocks(BranchPos.x, BranchPos.y, BranchPos.z, a_OtherBlocks, BigO2, ARRAYCOUNT(BigO2), E_BLOCK_NEW_LEAVES, E_META_NEW_LEAVES_ACACIA_WOOD);
-	PushCoordBlocks(BranchPos.x, BranchPos.y + 1, BranchPos.z, a_OtherBlocks, BigO1, ARRAYCOUNT(BigO1), E_BLOCK_NEW_LEAVES, E_META_NEW_LEAVES_ACACIA_WOOD);
-	a_OtherBlocks.push_back(sSetBlock(BranchPos.x, BranchPos.y + 1, BranchPos.z, E_BLOCK_NEW_LEAVES, E_META_NEW_LEAVES_ACACIA_WOOD));
+	PushCoordBlocks(BranchPos.x, BranchPos.y, BranchPos.z, a_OtherBlocks, BigO2, ARRAYCOUNT(BigO2), E_BLOCK_NEW_LEAVES, E_META_NEWLEAVES_ACACIA);
+	PushCoordBlocks(BranchPos.x, BranchPos.y + 1, BranchPos.z, a_OtherBlocks, BigO1, ARRAYCOUNT(BigO1), E_BLOCK_NEW_LEAVES, E_META_NEWLEAVES_ACACIA);
+	a_OtherBlocks.push_back(sSetBlock(BranchPos.x, BranchPos.y + 1, BranchPos.z, E_BLOCK_NEW_LEAVES, E_META_NEWLEAVES_ACACIA));
 
 	// Choose if we have to add another branch
 	bool TwoTop = (a_Noise.IntNoise3D(a_BlockX, a_BlockY, a_BlockZ) < 0 ? true : false);
@@ -577,9 +578,9 @@ void GetAcaciaTreeImage(int a_BlockX, int a_BlockY, int a_BlockZ, cNoise & a_Noi
 	}
 
 	// And add the leaves ontop of the second branch
-	PushCoordBlocks(BranchPos.x, BranchPos.y, BranchPos.z, a_OtherBlocks, BigO2, ARRAYCOUNT(BigO2), E_BLOCK_NEW_LEAVES, E_META_NEW_LEAVES_ACACIA_WOOD);
-	PushCoordBlocks(BranchPos.x, BranchPos.y + 1, BranchPos.z, a_OtherBlocks, BigO1, ARRAYCOUNT(BigO1), E_BLOCK_NEW_LEAVES, E_META_NEW_LEAVES_ACACIA_WOOD);
-	a_OtherBlocks.push_back(sSetBlock(BranchPos.x, BranchPos.y + 1, BranchPos.z, E_BLOCK_NEW_LEAVES, E_META_NEW_LEAVES_ACACIA_WOOD));
+	PushCoordBlocks(BranchPos.x, BranchPos.y, BranchPos.z, a_OtherBlocks, BigO2, ARRAYCOUNT(BigO2), E_BLOCK_NEW_LEAVES, E_META_NEWLEAVES_ACACIA);
+	PushCoordBlocks(BranchPos.x, BranchPos.y + 1, BranchPos.z, a_OtherBlocks, BigO1, ARRAYCOUNT(BigO1), E_BLOCK_NEW_LEAVES, E_META_NEWLEAVES_ACACIA);
+	a_OtherBlocks.push_back(sSetBlock(BranchPos.x, BranchPos.y + 1, BranchPos.z, E_BLOCK_NEW_LEAVES, E_META_NEWLEAVES_ACACIA));
 }
 
 
@@ -598,6 +599,15 @@ void GetDarkoakTreeImage(int a_BlockX, int a_BlockY, int a_BlockZ, cNoise & a_No
 		a_LogBlocks.push_back(sSetBlock(a_BlockX + 1, a_BlockY + i, a_BlockZ, E_BLOCK_NEW_LOG, E_META_NEW_LOG_DARK_OAK_WOOD));
 		a_LogBlocks.push_back(sSetBlock(a_BlockX, a_BlockY + i, a_BlockZ + 1, E_BLOCK_NEW_LOG, E_META_NEW_LOG_DARK_OAK_WOOD));
 		a_LogBlocks.push_back(sSetBlock(a_BlockX + 1, a_BlockY + i, a_BlockZ + 1, E_BLOCK_NEW_LOG, E_META_NEW_LOG_DARK_OAK_WOOD));
+	}
+
+	// Prevent floating trees by placing dirt under them
+	for (int i = 1; i < 5; i++)
+	{
+		a_OtherBlocks.push_back(sSetBlock(a_BlockX, a_BlockY - i, a_BlockZ, E_BLOCK_DIRT, E_META_DIRT_NORMAL));
+		a_OtherBlocks.push_back(sSetBlock(a_BlockX + 1, a_BlockY - i, a_BlockZ, E_BLOCK_DIRT, E_META_DIRT_NORMAL));
+		a_OtherBlocks.push_back(sSetBlock(a_BlockX, a_BlockY - i, a_BlockZ + 1, E_BLOCK_DIRT, E_META_DIRT_NORMAL));
+		a_OtherBlocks.push_back(sSetBlock(a_BlockX + 1, a_BlockY - i, a_BlockZ + 1, E_BLOCK_DIRT, E_META_DIRT_NORMAL));
 	}
 
 	// Create branches
@@ -633,15 +643,15 @@ void GetDarkoakTreeImage(int a_BlockX, int a_BlockY, int a_BlockZ, cNoise & a_No
 	// The lower two leaves layers are BigO4 with log in the middle and possibly corners:
 	for (int i = 0; i < 2; i++)
 	{
-		PushCoordBlocks(a_BlockX, hei, a_BlockZ, a_OtherBlocks, BigO4, ARRAYCOUNT(BigO4), E_BLOCK_NEW_LEAVES, E_META_NEW_LEAVES_DARK_OAK_WOOD);
-		PushCornerBlocks(a_BlockX, hei, a_BlockZ, a_Seq, a_Noise, 0x5fffffff, a_OtherBlocks, 3, E_BLOCK_NEW_LEAVES, E_META_NEW_LEAVES_DARK_OAK_WOOD);
+		PushCoordBlocks(a_BlockX, hei, a_BlockZ, a_OtherBlocks, BigO4, ARRAYCOUNT(BigO4), E_BLOCK_NEW_LEAVES, E_META_NEWLEAVES_DARK_OAK);
+		PushCornerBlocks(a_BlockX, hei, a_BlockZ, a_Seq, a_Noise, 0x5fffffff, a_OtherBlocks, 3, E_BLOCK_NEW_LEAVES, E_META_NEWLEAVES_DARK_OAK);
 		hei++;
 	}  // for i < 2
 
 	// The top leaves layer is a BigO3 with leaves in the middle and possibly corners:
-	PushCoordBlocks(a_BlockX, hei, a_BlockZ, a_OtherBlocks, BigO3, ARRAYCOUNT(BigO3), E_BLOCK_NEW_LEAVES, E_META_NEW_LEAVES_DARK_OAK_WOOD);
-	PushCornerBlocks(a_BlockX, hei, a_BlockZ, a_Seq, a_Noise, 0x5fffffff, a_OtherBlocks, 3, E_BLOCK_NEW_LEAVES, E_META_NEW_LEAVES_DARK_OAK_WOOD);
-	a_OtherBlocks.push_back(sSetBlock(a_BlockX, hei, a_BlockZ, E_BLOCK_NEW_LEAVES, E_META_NEW_LEAVES_DARK_OAK_WOOD));
+	PushCoordBlocks(a_BlockX, hei, a_BlockZ, a_OtherBlocks, BigO3, ARRAYCOUNT(BigO3), E_BLOCK_NEW_LEAVES, E_META_NEWLEAVES_DARK_OAK);
+	PushCornerBlocks(a_BlockX, hei, a_BlockZ, a_Seq, a_Noise, 0x5fffffff, a_OtherBlocks, 3, E_BLOCK_NEW_LEAVES, E_META_NEWLEAVES_DARK_OAK);
+	a_OtherBlocks.push_back(sSetBlock(a_BlockX, hei, a_BlockZ, E_BLOCK_NEW_LEAVES, E_META_NEWLEAVES_DARK_OAK));
 }
 
 
@@ -651,28 +661,28 @@ void GetDarkoakTreeImage(int a_BlockX, int a_BlockY, int a_BlockZ, cNoise & a_No
 void GetTallBirchTreeImage(int a_BlockX, int a_BlockY, int a_BlockZ, cNoise & a_Noise, int a_Seq, sSetBlockVector & a_LogBlocks, sSetBlockVector & a_OtherBlocks)
 {
 	HEIGHTTYPE Height = 9 + (a_Noise.IntNoise3DInt(a_BlockX + 64 * a_Seq, a_BlockY, a_BlockZ) % 3);
-	
+
 	// Prealloc, so that we don't realloc too often later:
 	a_LogBlocks.reserve(static_cast<size_t>(Height));
 	a_OtherBlocks.reserve(80);
-	
+
 	// The entire trunk, out of logs:
 	for (int i = Height - 1; i >= 0; --i)
 	{
 		a_LogBlocks.push_back(sSetBlock(a_BlockX, a_BlockY + i, a_BlockZ, E_BLOCK_LOG, E_META_LOG_BIRCH));
 	}
 	int h = a_BlockY + Height;
-	
+
 	// Top layer - just the Plus:
 	PushCoordBlocks(a_BlockX, h, a_BlockZ, a_OtherBlocks, BigO1, ARRAYCOUNT(BigO1), E_BLOCK_LEAVES, E_META_LEAVES_BIRCH);
 	a_OtherBlocks.push_back(sSetBlock(a_BlockX, h, a_BlockZ, E_BLOCK_LEAVES, E_META_LEAVES_BIRCH));  // There's no log at this layer
 	h--;
-	
+
 	// Second layer - log, Plus and maybe Corners:
 	PushCoordBlocks (a_BlockX, h, a_BlockZ, a_OtherBlocks, BigO1, ARRAYCOUNT(BigO1), E_BLOCK_LEAVES, E_META_LEAVES_BIRCH);
 	PushCornerBlocks(a_BlockX, h, a_BlockZ, a_Seq, a_Noise, 0x5fffffff, a_OtherBlocks, 1, E_BLOCK_LEAVES, E_META_LEAVES_BIRCH);
 	h--;
-	
+
 	// Third and fourth layers - BigO2 and maybe 2 * Corners:
 	for (int Row = 0; Row < 2; Row++)
 	{
@@ -708,11 +718,11 @@ void GetSpruceTreeImage(int a_BlockX, int a_BlockY, int a_BlockZ, cNoise & a_Noi
 	// Spruces have a top section with layer sizes of (0, 1, 0) or only (1, 0),
 	// then 1 - 3 sections of ascending sizes (1, 2) [most often], (1, 3) or (1, 2, 3)
 	// and an optional bottom section of size 1, followed by 1 - 3 clear trunk blocks
-	
+
 	// We'll use bits from this number as partial random numbers; but the noise function has mod8 irregularities
 	// (each of the mod8 remainders has a very different chance of occurrence) - that's why we divide by 8
 	int MyRandom = a_Noise.IntNoise3DInt(a_BlockX + 32 * a_Seq, a_BlockY + 32 * a_Seq, a_BlockZ) / 8;
-	
+
 	static const HEIGHTTYPE  sHeights[] = {1, 2, 2, 3};
 	HEIGHTTYPE Height = sHeights[MyRandom & 3];
 	MyRandom >>= 2;
@@ -720,14 +730,14 @@ void GetSpruceTreeImage(int a_BlockX, int a_BlockY, int a_BlockZ, cNoise & a_Noi
 	// Prealloc, so that we don't realloc too often later:
 	a_LogBlocks.reserve(static_cast<size_t>(Height));
 	a_OtherBlocks.reserve(180);
-	
+
 	// Clear trunk blocks:
 	for (int i = 0; i < Height; i++)
 	{
 		a_LogBlocks.push_back(sSetBlock(a_BlockX, a_BlockY + i, a_BlockZ, E_BLOCK_LOG, E_META_LOG_CONIFER));
 	}
 	Height += a_BlockY;
-	
+
 	// Optional size-1 bottom leaves layer:
 	if ((MyRandom & 1) == 0)
 	{
@@ -736,7 +746,7 @@ void GetSpruceTreeImage(int a_BlockX, int a_BlockY, int a_BlockZ, cNoise & a_Noi
 		Height++;
 	}
 	MyRandom >>= 1;
-	
+
 	// 1 to 3 sections of leaves layers:
 	static const int sNumSections[] = {1, 2, 2, 3};
 	int NumSections = sNumSections[MyRandom & 3];
@@ -778,7 +788,7 @@ void GetSpruceTreeImage(int a_BlockX, int a_BlockY, int a_BlockZ, cNoise & a_Noi
 		}  // switch (SectionType)
 		MyRandom >>= 2;
 	}  // for i - Sections
-	
+
 	if ((MyRandom & 1) == 0)
 	{
 		// (0, 1, 0) top:
@@ -804,7 +814,7 @@ void GetPineTreeImage(int a_BlockX, int a_BlockY, int a_BlockZ, cNoise & a_Noise
 {
 	// Tall, little leaves on top. The top leaves are arranged in a shape of two cones joined by their bases.
 	// There can be one or two layers representing the cone bases (SameSizeMax)
-	
+
 	int MyRandom = a_Noise.IntNoise3DInt(a_BlockX + 32 * a_Seq, a_BlockY, a_BlockZ + 32 * a_Seq) / 8;
 	int TrunkHeight = 8 + (MyRandom % 3);
 	int SameSizeMax = ((MyRandom & 8) == 0) ? 1 : 0;
@@ -814,7 +824,7 @@ void GetPineTreeImage(int a_BlockX, int a_BlockY, int a_BlockZ, cNoise & a_Noise
 	{
 		SameSizeMax = 0;
 	}
-	
+
 	// Pre-allocate the vector:
 	a_LogBlocks.reserve(static_cast<size_t>(TrunkHeight));
 	a_OtherBlocks.reserve(static_cast<size_t>(NumLeavesLayers * 25));
@@ -865,19 +875,19 @@ void GetSwampTreeImage(int a_BlockX, int a_BlockY, int a_BlockZ, cNoise & a_Nois
 	} ;
 
 	int Height = 3 + (a_Noise.IntNoise3DInt(a_BlockX + 32 * a_Seq, a_BlockY, a_BlockZ + 32 * a_Seq) / 8) % 3;
-	
+
 	a_LogBlocks.reserve(static_cast<size_t>(Height));
 	a_OtherBlocks.reserve(2 * ARRAYCOUNT(BigO2) + 2 * ARRAYCOUNT(BigO3) + static_cast<size_t>(Height) * ARRAYCOUNT(Vines) + 20);
-	
+
 	for (int i = 0; i < Height; i++)
 	{
 		a_LogBlocks.push_back(sSetBlock(a_BlockX, a_BlockY + i, a_BlockZ, E_BLOCK_LOG, E_META_LOG_APPLE));
 	}
 	int hei = a_BlockY + Height - 2;
-	
+
 	// Put vines around the lowermost leaves layer:
 	PushSomeColumns(a_BlockX, hei, a_BlockZ, Height, a_Seq, a_Noise, 0x3fffffff, a_OtherBlocks, Vines, ARRAYCOUNT(Vines), E_BLOCK_VINES);
-	
+
 	// The lower two leaves layers are BigO3 with log in the middle and possibly corners:
 	for (int i = 0; i < 2; i++)
 	{
@@ -903,16 +913,16 @@ void GetSwampTreeImage(int a_BlockX, int a_BlockY, int a_BlockZ, cNoise & a_Nois
 void GetAppleBushImage(int a_BlockX, int a_BlockY, int a_BlockZ, cNoise & a_Noise, int a_Seq, sSetBlockVector & a_LogBlocks, sSetBlockVector & a_OtherBlocks)
 {
 	a_OtherBlocks.reserve(3 + ARRAYCOUNT(BigO2) + ARRAYCOUNT(BigO1));
-	
+
 	int hei = a_BlockY;
 	a_LogBlocks.push_back(sSetBlock(a_BlockX, hei, a_BlockZ, E_BLOCK_LOG, E_META_LOG_JUNGLE));
 	PushCoordBlocks(a_BlockX, hei, a_BlockZ, a_OtherBlocks, BigO2, ARRAYCOUNT(BigO2), E_BLOCK_LEAVES, E_META_LEAVES_APPLE);
 	hei++;
-	
+
 	a_OtherBlocks.push_back(sSetBlock(a_BlockX, hei, a_BlockZ, E_BLOCK_LEAVES, E_META_LEAVES_APPLE));
 	PushCoordBlocks(a_BlockX, hei, a_BlockZ, a_OtherBlocks, BigO1, ARRAYCOUNT(BigO1), E_BLOCK_LEAVES, E_META_LEAVES_APPLE);
 	hei++;
-	
+
 	a_OtherBlocks.push_back(sSetBlock(a_BlockX, hei, a_BlockZ, E_BLOCK_LEAVES, E_META_LEAVES_APPLE));
 }
 
@@ -920,9 +930,9 @@ void GetAppleBushImage(int a_BlockX, int a_BlockY, int a_BlockZ, cNoise & a_Nois
 
 
 
-void GetJungleTreeImage(int a_BlockX, int a_BlockY, int a_BlockZ, cNoise & a_Noise, int a_Seq, sSetBlockVector & a_LogBlocks, sSetBlockVector & a_OtherBlocks)
+void GetJungleTreeImage(int a_BlockX, int a_BlockY, int a_BlockZ, cNoise & a_Noise, int a_Seq, sSetBlockVector & a_LogBlocks, sSetBlockVector & a_OtherBlocks, bool a_Large)
 {
-	if (a_Noise.IntNoise3DInt(a_BlockX + 32 * a_Seq, a_BlockY + 32 * a_Seq, a_BlockZ) < 0x60000000)
+	if (!a_Large)
 	{
 		GetSmallJungleTreeImage(a_BlockX, a_BlockY, a_BlockZ, a_Noise, a_Seq, a_LogBlocks, a_OtherBlocks);
 	}
@@ -949,12 +959,12 @@ void GetLargeJungleTreeImage(int a_BlockX, int a_BlockY, int a_BlockZ, cNoise & 
 		{-5, -2, 8}, {-5, -1, 8}, {-5, 0, 8}, {-5, 1, 8}, {-5, 2, 8},  // West face
 		// TODO: vines around the trunk, proper metas and height
 	} ;
-	
+
 	int Height = 24 + (a_Noise.IntNoise3DInt(a_BlockX + 32 * a_Seq, a_BlockY, a_BlockZ + 32 * a_Seq) / 11) % 24;
-	
+
 	a_LogBlocks.reserve(static_cast<size_t>(Height) * 4);
 	a_OtherBlocks.reserve(2 * ARRAYCOUNT(BigO4) + ARRAYCOUNT(BigO3) + static_cast<size_t>(Height) * ARRAYCOUNT(Vines) + 50);
-	
+
 	for (int i = 0; i < Height; i++)
 	{
 		a_LogBlocks.push_back(sSetBlock(a_BlockX,     a_BlockY + i, a_BlockZ,     E_BLOCK_LOG, E_META_LOG_JUNGLE));
@@ -963,10 +973,19 @@ void GetLargeJungleTreeImage(int a_BlockX, int a_BlockY, int a_BlockZ, cNoise & 
 		a_LogBlocks.push_back(sSetBlock(a_BlockX + 1, a_BlockY + i, a_BlockZ + 1, E_BLOCK_LOG, E_META_LOG_JUNGLE));
 	}
 	int hei = a_BlockY + Height - 2;
-	
+
+	// Prevent floating trees by placing dirt under them
+	for (int i = 1; i < 5; i++)
+	{
+		a_OtherBlocks.push_back(sSetBlock(a_BlockX, a_BlockY - i, a_BlockZ, E_BLOCK_DIRT, E_META_DIRT_NORMAL));
+		a_OtherBlocks.push_back(sSetBlock(a_BlockX + 1, a_BlockY - i, a_BlockZ, E_BLOCK_DIRT, E_META_DIRT_NORMAL));
+		a_OtherBlocks.push_back(sSetBlock(a_BlockX, a_BlockY - i, a_BlockZ + 1, E_BLOCK_DIRT, E_META_DIRT_NORMAL));
+		a_OtherBlocks.push_back(sSetBlock(a_BlockX + 1, a_BlockY - i, a_BlockZ + 1, E_BLOCK_DIRT, E_META_DIRT_NORMAL));
+	}
+
 	// Put vines around the lowermost leaves layer:
 	PushSomeColumns(a_BlockX, hei, a_BlockZ, Height, a_Seq, a_Noise, 0x3fffffff, a_OtherBlocks, Vines, ARRAYCOUNT(Vines), E_BLOCK_VINES);
-	
+
 	// The lower two leaves layers are BigO4 with log in the middle and possibly corners:
 	for (int i = 0; i < 2; i++)
 	{
@@ -998,7 +1017,7 @@ void GetSmallJungleTreeImage(int a_BlockX, int a_BlockY, int a_BlockZ, cNoise & 
 	} ;
 
 	int Height = 7 + (a_Noise.IntNoise3DInt(a_BlockX + 5 * a_Seq, a_BlockY, a_BlockZ + 5 * a_Seq) / 5) % 3;
-	
+
 	a_LogBlocks.reserve(static_cast<size_t>(Height));
 	a_OtherBlocks.reserve(
 		2 * ARRAYCOUNT(BigO3) +       // O3 layer, 2x
@@ -1007,16 +1026,16 @@ void GetSmallJungleTreeImage(int a_BlockX, int a_BlockY, int a_BlockZ, cNoise & 
 		static_cast<size_t>(Height) * ARRAYCOUNT(Vines) +  // Vines
 		50  // some safety
 	);
-	
+
 	for (int i = 0; i < Height; i++)
 	{
 		a_LogBlocks.push_back(sSetBlock(a_BlockX, a_BlockY + i, a_BlockZ, E_BLOCK_LOG, E_META_LOG_JUNGLE));
 	}
 	int hei = a_BlockY + Height - 3;
-	
+
 	// Put vines around the lowermost leaves layer:
 	PushSomeColumns(a_BlockX, hei, a_BlockZ, Height, a_Seq, a_Noise, 0x3fffffff, a_OtherBlocks, Vines, ARRAYCOUNT(Vines), E_BLOCK_VINES);
-	
+
 	// The lower two leaves layers are BigO3 with log in the middle and possibly corners:
 	for (int i = 0; i < 2; i++)
 	{
@@ -1032,7 +1051,7 @@ void GetSmallJungleTreeImage(int a_BlockX, int a_BlockY, int a_BlockZ, cNoise & 
 		PushCornerBlocks(a_BlockX, hei, a_BlockZ, a_Seq, a_Noise, 0x5fffffff, a_OtherBlocks, 2, E_BLOCK_LEAVES, E_META_LEAVES_JUNGLE);
 		hei++;
 	}  // for i - 2*
-	
+
 	// Top plus, all leaves:
 	PushCoordBlocks(a_BlockX, hei, a_BlockZ, a_OtherBlocks, BigO1, ARRAYCOUNT(BigO1), E_BLOCK_LEAVES, E_META_LEAVES_JUNGLE);
 	a_OtherBlocks.push_back(sSetBlock(a_BlockX, hei, a_BlockZ, E_BLOCK_LEAVES, E_META_LEAVES_JUNGLE));
@@ -1041,3 +1060,85 @@ void GetSmallJungleTreeImage(int a_BlockX, int a_BlockY, int a_BlockZ, cNoise & 
 
 
 
+
+bool GetLargeTreeAdjustment(cWorld & a_World, int & a_X, int & a_Y, int & a_Z, NIBBLETYPE a_Meta)
+{
+	bool IsLarge = true;
+	a_Meta = a_Meta & 0x07;
+
+	// Check to see if we are the northwest corner
+	for (int x = 0; x  < 2; ++x)
+	{
+		for (int z = 0; z < 2; ++z)
+		{
+			NIBBLETYPE meta;
+			BLOCKTYPE type;
+			a_World.GetBlockTypeMeta(a_X + x, a_Y, a_Z + z, type, meta);
+			IsLarge = IsLarge && (type == E_BLOCK_SAPLING) && ((a_Meta & meta) == a_Meta);
+		}
+	}
+
+	if (IsLarge)
+	{
+		return true;
+	}
+
+	IsLarge = true;
+	// Check to see if we are the southwest corner
+	for (int x = 0; x  < 2; ++x)
+	{
+		for (int z = 0; z > -2; --z)
+		{
+			NIBBLETYPE meta;
+			BLOCKTYPE type;
+			a_World.GetBlockTypeMeta(a_X + x, a_Y, a_Z + z, type, meta);
+			IsLarge = IsLarge && (type == E_BLOCK_SAPLING) && ((a_Meta & meta) == a_Meta);
+		}
+	}
+
+	if (IsLarge)
+	{
+		--a_Z;
+		return true;
+	}
+
+	IsLarge = true;
+	// Check to see if we are the southeast corner
+	for (int x = 0; x > -2; --x)
+	{
+		for (int z = 0; z > -2; --z)
+		{
+			NIBBLETYPE meta;
+			BLOCKTYPE type;
+			a_World.GetBlockTypeMeta(a_X + x, a_Y, a_Z + z, type, meta);
+			IsLarge = IsLarge && (type == E_BLOCK_SAPLING) && ((a_Meta & meta) == a_Meta);
+		}
+	}
+
+	if (IsLarge)
+	{
+		--a_Z;
+		--a_X;
+		return true;
+	}
+
+	IsLarge = true;
+	// Check to see if we are the northeast corner
+	for (int x = 0; x > -2; --x)
+	{
+		for (int z = 0; z < 2; ++z)
+		{
+			NIBBLETYPE meta;
+			BLOCKTYPE type;
+			a_World.GetBlockTypeMeta(a_X + x, a_Y, a_Z + z, type, meta);
+			IsLarge = IsLarge && (type == E_BLOCK_SAPLING) && ((a_Meta & meta) == a_Meta);
+		}
+	}
+
+	if (IsLarge)
+	{
+		--a_X;
+	}
+
+	return IsLarge;
+}

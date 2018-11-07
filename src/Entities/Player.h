@@ -5,9 +5,11 @@
 #include "../Inventory.h"
 #include "../Defines.h"
 #include "../World.h"
-#include "../ClientHandle.h"
+#include "../Items/ItemHandler.h"
 
 #include "../Statistics.h"
+
+#include "../UUID.h"
 
 
 
@@ -42,15 +44,19 @@ public:
 
 	cPlayer(cClientHandlePtr a_Client, const AString & a_PlayerName);
 
-	virtual ~cPlayer();
+	virtual bool Initialize(OwnedEntity a_Self, cWorld & a_World) override;
+
+	virtual ~cPlayer() override;
 
 	virtual void SpawnOn(cClientHandle & a_Client) override;
 
 	virtual void Tick(std::chrono::milliseconds a_Dt, cChunk & a_Chunk) override;
 
+	void TickFreezeCode();
+
 	virtual void HandlePhysics(std::chrono::milliseconds a_Dt, cChunk &) override { UNUSED(a_Dt); }
 
-	/** Returns the curently equipped weapon; empty item if none */
+	/** Returns the currently equipped weapon; empty item if none */
 	virtual cItem GetEquippedWeapon(void) const override { return m_Inventory.GetEquippedItem(); }
 
 	/** Returns the currently equipped helmet; empty item if none */
@@ -65,6 +71,10 @@ public:
 	/** Returns the currently equipped boots; empty item if none */
 	virtual cItem GetEquippedBoots(void) const override { return m_Inventory.GetEquippedBoots(); }
 
+	/** Returns the currently offhand equipped item; empty item if none */
+	virtual cItem GetOffHandEquipedItem(void) const override { return m_Inventory.GetShieldSlot(); }
+
+	virtual void ApplyArmorDamage(int DamageBlocked) override;
 
 	// tolua_begin
 
@@ -83,7 +93,7 @@ public:
 	/** Gets the experience total - XpTotal for score on death */
 	inline int GetXpLifetimeTotal(void) { return m_LifetimeTotalXp; }
 
-	/** Gets the currrent experience */
+	/** Gets the current experience */
 	inline int GetCurrentXp(void) { return m_CurrentXp; }
 
 	/** Gets the current level - XpLevel */
@@ -92,13 +102,13 @@ public:
 	/** Gets the experience bar percentage - XpP */
 	float GetXpPercentage(void);
 
-	/** Caculates the amount of XP needed for a given level
-	Ref: http://minecraft.gamepedia.com/XP
+	/** Calculates the amount of XP needed for a given level
+	Ref: https://minecraft.gamepedia.com/XP
 	*/
 	static int XpForLevel(int a_Level);
 
 	/** Inverse of XpForLevel
-	Ref: http://minecraft.gamepedia.com/XP
+	Ref: https://minecraft.gamepedia.com/XP
 	values are as per this with pre-calculations
 	*/
 	static int CalcLevelFromXp(int a_CurrentXp);
@@ -117,8 +127,8 @@ public:
 	/** Returns true if the player is currently charging the bow */
 	bool IsChargingBow(void) const { return m_IsChargingBow; }
 
-	void SetTouchGround( bool a_bTouchGround);
-	inline void SetStance( const double a_Stance) { m_Stance = a_Stance; }
+	void SetTouchGround(bool a_bTouchGround);
+	inline void SetStance(const double a_Stance) { m_Stance = a_Stance; }
 	double GetEyeHeight(void) const;  // tolua_export
 	Vector3d GetEyePosition(void) const;  // tolua_export
 	virtual bool IsOnGround(void) const override { return m_bTouchGround; }
@@ -136,7 +146,19 @@ public:
 
 	virtual void TeleportToCoords(double a_PosX, double a_PosY, double a_PosZ) override;
 
+	// Updates player's capabilities - flying, visibility, etc. from their gamemode.
+	void SetCapabilities();
+
 	// tolua_begin
+
+	/** Prevent the player from moving and lock him into a_Location. */
+	void Freeze(const Vector3d & a_Location);
+
+	/** Is the player frozen? */
+	bool IsFrozen();
+
+	/** Cancels Freeze(...) and allows the player to move naturally. */
+	void Unfreeze();
 
 	/** Sends the "look" packet to the player, forcing them to set their rotation to the specified values.
 	a_YawDegrees is clipped to range [-180, +180),
@@ -162,12 +184,6 @@ public:
 	*/
 	void SetGameMode(eGameMode a_GameMode);
 
-	// Sets the current gamemode, doesn't check validity, doesn't send update packets to client
-	void LoginSetGameMode(eGameMode a_GameMode);
-
-	// Updates player's capabilities - flying, visibility, etc. from their gamemode.
-	void SetCapabilities();
-
 	/** Returns true if the player is in Creative mode, either explicitly, or by inheriting from current world */
 	bool IsGameModeCreative(void) const;
 
@@ -179,6 +195,18 @@ public:
 
 	/** Returns true if the player is in Spectator mode, either explicitly, or by inheriting from current world */
 	bool IsGameModeSpectator(void) const;
+
+	/** Returns true if the player is fireproof
+	Stops players burning in creative or spectator modes.
+	*/
+	virtual bool IsFireproof() const override
+	{
+		return (m_IsFireproof || IsGameModeCreative() || IsGameModeSpectator());
+
+	}
+
+	/** Returns true if the player can be targeted by Mobs */
+	bool CanMobsTarget(void) const;
 
 	AString GetIP(void) const { return m_IP; }  // tolua_export
 
@@ -208,16 +236,13 @@ public:
 	@deprecated Use SetSpeed instead. */
 	void ForceSetSpeed(const Vector3d & a_Speed);  // tolua_export
 
-	/** Tries to move to a new position, with attachment-related checks (y == -999) */
-	void MoveTo(const Vector3d & a_NewPos);  // tolua_export
-
 	cWindow * GetWindow(void) { return m_CurrentWindow; }  // tolua_export
 	const cWindow * GetWindow(void) const { return m_CurrentWindow; }
 
-	/** Opens the specified window; closes the current one first using CloseWindow() */
-	void OpenWindow(cWindow * a_Window);  // Exported in ManualBindings.cpp
-
 	// tolua_begin
+
+	/** Opens the specified window; closes the current one first using CloseWindow() */
+	void OpenWindow(cWindow & a_Window);
 
 	/** Closes the current window, resets current window to m_InventoryWindow. A plugin may refuse the closing if a_CanRefuse is true */
 	void CloseWindow(bool a_CanRefuse = true);
@@ -235,14 +260,19 @@ public:
 
 	// tolua_begin
 
-	void SendMessage          (const AString & a_Message) { m_ClientHandle->SendChat(a_Message, mtCustom); }
-	void SendMessageInfo      (const AString & a_Message) { m_ClientHandle->SendChat(a_Message, mtInformation); }
-	void SendMessageFailure   (const AString & a_Message) { m_ClientHandle->SendChat(a_Message, mtFailure); }
-	void SendMessageSuccess   (const AString & a_Message) { m_ClientHandle->SendChat(a_Message, mtSuccess); }
-	void SendMessageWarning   (const AString & a_Message) { m_ClientHandle->SendChat(a_Message, mtWarning); }
-	void SendMessageFatal     (const AString & a_Message) { m_ClientHandle->SendChat(a_Message, mtFailure); }
-	void SendMessagePrivateMsg(const AString & a_Message, const AString & a_Sender) { m_ClientHandle->SendChat(a_Message, mtPrivateMessage, a_Sender); }
-	void SendMessage          (const cCompositeChat & a_Message) { m_ClientHandle->SendChat(a_Message); }
+	void SendMessage              (const AString & a_Message);
+	void SendMessageInfo          (const AString & a_Message);
+	void SendMessageFailure       (const AString & a_Message);
+	void SendMessageSuccess       (const AString & a_Message);
+	void SendMessageWarning       (const AString & a_Message);
+	void SendMessageFatal         (const AString & a_Message);
+	void SendMessagePrivateMsg    (const AString & a_Message, const AString & a_Sender);
+	void SendMessage              (const cCompositeChat & a_Message);
+	void SendMessageRaw           (const AString & a_MessageRaw, eChatType a_Type = eChatType::ctChatBox);
+	void SendSystemMessage        (const AString & a_Message);
+	void SendAboveActionBarMessage(const AString & a_Message);
+	void SendSystemMessage        (const cCompositeChat & a_Message);
+	void SendAboveActionBarMessage(const cCompositeChat & a_Message);
 
 	const AString & GetName(void) const { return m_PlayerName; }
 	void SetName(const AString & a_Name) { m_PlayerName = a_Name; }
@@ -267,6 +297,12 @@ public:
 	/** Returns the full color code to use for this player, based on their rank.
 	The returned value either is empty, or includes the cChatColor::Delimiter. */
 	AString GetColor(void) const;
+
+	/** Returns the player name prefix, may contain @ format directives */
+	AString GetPrefix(void) const;
+
+	/** Returns the player name suffix, may contain @ format directives */
+	AString GetSuffix(void) const;
 
 	/** Returns the name that is used in the playerlist. */
 	AString GetPlayerListName(void) const;
@@ -305,18 +341,18 @@ public:
 	/** Returns true if the player is currently in the process of eating the currently equipped item */
 	bool IsEating(void) const { return (m_EatingFinishTick >= 0); }
 
-	/** Returns true if the player is currently flying. */
+	/** Returns true if the player is currently flying */
 	bool IsFlying(void) const { return m_IsFlying; }
 
-	/** Returns if a player is sleeping in a bed */
+	/** Returns true if a player is sleeping in a bed */
 	bool IsInBed(void) const { return m_bIsInBed; }
 
-	/** returns true if the player has thrown out a floater. */
+	/** Returns true if the player has thrown out a floater */
 	bool IsFishing(void) const { return m_IsFishing; }
 
-	void SetIsFishing(bool a_IsFishing, int a_FloaterID = -1) { m_IsFishing = a_IsFishing; m_FloaterID = a_FloaterID; }
+	void SetIsFishing(bool a_IsFishing, UInt32 a_FloaterID = cEntity::INVALID_ID) { m_IsFishing = a_IsFishing; m_FloaterID = a_FloaterID; }
 
-	int GetFloaterID(void) const { return m_FloaterID; }
+	UInt32 GetFloaterID(void) const { return m_FloaterID; }
 
 	// tolua_end
 
@@ -353,7 +389,7 @@ public:
 
 	/** Moves the player to the specified world.
 	Returns true if successful, false on failure (world not found). */
-	virtual bool DoMoveToWorld(cWorld * a_World, bool a_ShouldSendRespawn) override;
+	virtual bool DoMoveToWorld(cWorld * a_World, bool a_ShouldSendRespawn, Vector3d a_NewPosition) override;
 
 	/** Saves all player data, such as inventory, to JSON */
 	bool SaveToDisk(void);
@@ -374,14 +410,34 @@ public:
 
 	const AString & GetLoadedWorldName() { return m_LoadedWorldName; }
 
-	void UseEquippedItem(int a_Amount = 1);
+	/** Opens the inventory of any tame horse the player is riding.
+	If the player is not riding a horse or if the horse is untamed, does nothing. */
+	void OpenHorseInventory();
+
+	/** Damage the player's equipped item by a_Damage, possibly less if the
+	equipped item is enchanted. */
+	void UseEquippedItem(short a_Damage = 1);
+
+	/** Damage the player's equipped item by the amount of damage such an item
+	is damaged by when used for a_Action */
+	void UseEquippedItem(cItemHandler::eDurabilityLostAction a_Action);
+
+	/** Damage the item in a_SlotNumber by a_Damage, possibly less if the
+	equipped item is enchanted. */
+	void UseItem(int a_SlotNumber, short a_Damage = 1);
 
 	void SendHealth(void);
+
+	// Send current active hotbar slot
+	void SendHotbarActiveSlot(void);
 
 	void SendExperience(void);
 
 	/** In UI windows, get the item that the player is dragging */
-	cItem & GetDraggingItem(void) {return m_DraggingItem; }
+	cItem & GetDraggingItem(void) {return m_DraggingItem; }  // tolua_export
+
+	/** In UI windows, set the item that the player is dragging */
+	void SetDraggingItem(const cItem & a_Item);  // tolua_export
 
 	// In UI windows, when inventory-painting:
 	/** Clears the list of slots that are being inventory-painted. To be used by cWindow only */
@@ -443,21 +499,31 @@ public:
 	*/
 	Vector3i GetLastBedPos(void) const { return m_LastBedPos; }
 
-	/** Sets the player's bed (home) position */
-	void SetBedPos(const Vector3i & a_Pos) { m_LastBedPos = a_Pos; }
+	/** Sets the player's bed (home / respawn) position to the specified position.
+	Sets the respawn world to the player's world. */
+	void SetBedPos(const Vector3i & a_Pos);
+
+	/** Sets the player's bed (home / respawn) position and respawn world to the specified parameters. */
+	void SetBedPos(const Vector3i & a_Pos, cWorld * a_World);
 
 	// tolua_end
 
+	// TODO lua export GetBedPos and GetBedWorld
+	cWorld * GetBedWorld();
+
 	/** Update movement-related statistics. */
-	void UpdateMovementStats(const Vector3d & a_DeltaPos);
+	void UpdateMovementStats(const Vector3d & a_DeltaPos, bool a_PreviousIsOnGround);
+
+	/** Whether placing the given blocks would intersect any entitiy */
+	bool DoesPlacingBlocksIntersectEntity(const sSetBlockVector & a_Blocks);
+
+	/** Returns the UUID that has been read from the client, or nil if not available. */
+	const cUUID & GetUUID(void) const { return m_UUID; }  // Exported in ManualBindings.cpp
 
 	// tolua_begin
 
 	/** Returns wheter the player can fly or not. */
 	virtual bool CanFly(void) const { return m_CanFly; }
-
-	/** Returns the UUID (short format) that has been read from the client, or empty string if not available. */
-	const AString & GetUUID(void) const { return m_UUID; }
 
 	/** (Re)loads the rank and permissions from the cRankManager.
 	Expects the m_UUID member to be valid.
@@ -475,6 +541,13 @@ public:
 	The blocks in range (a_BlockX - a_Range, a_BlockX + a_Range) are sent (NY-metric). */
 	void SendBlocksAround(int a_BlockX, int a_BlockY, int a_BlockZ, int a_Range = 1);
 
+	bool HasSkinPart(eSkinPart a_Part) const { return (m_SkinParts & a_Part) != 0; }
+	int GetSkinParts(void) const { return m_SkinParts; }
+	void SetSkinParts(int a_Parts);
+
+	eMainHand GetMainHand(void) const { return m_MainHand; }
+	void SetMainHand(eMainHand a_Hand);
+
 	// tolua_end
 
 	/** Calls the block placement hooks and places the blocks in the world.
@@ -485,16 +558,29 @@ public:
 	Assumes that all the blocks are in currently loaded chunks. */
 	bool PlaceBlocks(const sSetBlockVector & a_Blocks);
 
+	/** Notify nearby wolves that the player or one of the player's wolves took damage or did damage to an entity
+	@param a_Opponent the opponent we're fighting.
+	@param a_IsPlayerInvolved Should be true if the player took or did damage, and false if one of the player's wolves took or did damage.
+	*/
+	void NotifyNearbyWolves(cPawn * a_Opponent, bool a_IsPlayerInvolved);
+
 	// cEntity overrides:
 	virtual bool IsCrouched (void) const override { return m_IsCrouched; }
 	virtual bool IsSprinting(void) const override { return m_IsSprinting; }
 	virtual bool IsRclking  (void) const override { return IsEating() || IsChargingBow(); }
 
+	virtual void AttachTo(cEntity * a_AttachTo) override;
 	virtual void Detach(void) override;
 
 	/** Called by cClientHandle when the client is being destroyed.
 	The player removes its m_ClientHandle ownership so that the ClientHandle gets deleted. */
 	void RemoveClientHandle(void);
+
+	/** Returns the relative block hardness for the block a_Block.
+	The bigger it is the faster the player can break the block.
+	Returns zero if the block is instant breakable.
+	Otherwise it returns the dig speed (float GetDigSpeed(BLOCKTYPE a_Block)) divided by the block hardness (cBlockInfo::GetHardness(BLOCKTYPE a_Block)) divided by 30 if the player can harvest the block and divided by 100 if he can't. */
+	float GetPlayerRelativeBlockHardness(BLOCKTYPE a_Block);
 
 protected:
 
@@ -548,9 +634,6 @@ protected:
 	/** A "buffer" which adds up hunger before it is substracted from m_FoodSaturationLevel or m_FoodLevel. Each action adds a little */
 	double m_FoodExhaustionLevel;
 
-	float m_LastJumpHeight;
-	float m_LastGroundHeight;
-	bool m_bTouchGround;
 	double m_Stance;
 
 	/** Stores the player's inventory, consisting of crafting grid, hotbar, and main slots */
@@ -565,6 +648,9 @@ protected:
 	/** The player's last saved bed position */
 	Vector3i m_LastBedPos;
 
+	/** The world which the player respawns in upon death */
+	cWorld * m_SpawnWorld;
+
 	eGameMode m_GameMode;
 	AString m_IP;
 
@@ -576,6 +662,12 @@ protected:
 	cClientHandlePtr m_ClientHandle;
 
 	cSlotNums m_InventoryPaintSlots;
+
+	/** If true, we are locking m_Position to m_FrozenPosition. */
+	bool m_IsFrozen;
+
+	/** Was the player frozen manually by a plugin or automatically by the server? */
+	bool m_IsManuallyFrozen;
 
 	/** Max speed, relative to the game default.
 	1 means regular speed, 2 means twice as fast, 0.5 means half-speed.
@@ -595,8 +687,6 @@ protected:
 	bool m_IsCrouched;
 	bool m_IsSprinting;
 	bool m_IsFlying;
-	bool m_IsSwimming;
-	bool m_IsSubmerged;
 	bool m_IsFishing;
 
 	bool m_CanFly;  // If this is true the player can fly. Even if he is not in creative.
@@ -614,7 +704,7 @@ protected:
 	bool m_IsChargingBow;
 	int  m_BowCharge;
 
-	int m_FloaterID;
+	UInt32 m_FloaterID;
 
 	cTeam * m_Team;
 
@@ -633,11 +723,17 @@ protected:
 	*/
 	bool m_bIsTeleporting;
 
-	/** The short UUID (no dashes) of the player, as read from the ClientHandle.
-	If no ClientHandle is given, the UUID is initialized to empty. */
-	AString m_UUID;
+	/** The UUID of the player, as read from the ClientHandle.
+	If no ClientHandle is given, the UUID is nil. */
+	cUUID m_UUID;
 
 	AString m_CustomName;
+
+	/** Displayed skin part bit mask */
+	int m_SkinParts;
+
+	/** The main hand of the player */
+	eMainHand m_MainHand;
 
 	/** Sets the speed and sends it to the client, so that they are forced to move so. */
 	virtual void DoSetSpeed(double a_SpeedX, double a_SpeedY, double a_SpeedZ) override;
@@ -650,9 +746,6 @@ protected:
 	/** Filters out damage for creative mode / friendly fire */
 	virtual bool DoTakeDamage(TakeDamageInfo & TDI) override;
 
-	/** Stops players from burning in creative mode */
-	virtual void TickBurning(cChunk & a_Chunk) override;
-
 	/** Called in each tick to handle food-related processing */
 	void HandleFood(void);
 
@@ -662,10 +755,30 @@ protected:
 	/** Tosses a list of items. */
 	void TossItems(const cItems & a_Items);
 
-	/** Adds food exhaustion based on the difference between Pos and LastPos, sprinting status and swimming (in water block) */
-	void ApplyFoodExhaustionFromMovement();
-
 	/** Returns the filename for the player data based on the UUID given.
 	This can be used both for online and offline UUIDs. */
-	AString GetUUIDFileName(const AString & a_UUID);
+	AString GetUUIDFileName(const cUUID & a_UUID);
+
+	/** get player explosion exposure rate */
+	virtual float GetExplosionExposureRate(Vector3d a_ExplosionPosition, float a_ExlosionPower) override;
+private:
+
+	/** Pins the player to a_Location until Unfreeze() is called.
+	If ManuallyFrozen is false, the player will unfreeze when the chunk is loaded. */
+	void FreezeInternal(const Vector3d & a_Location, bool a_ManuallyFrozen);
+
+	/** Returns how high the liquid is in percent. Used by IsInsideWater */
+	float GetLiquidHeightPercent(NIBBLETYPE a_Meta);
+
+	/** Checks if the player is inside of water */
+	bool IsInsideWater();
+
+	/** Returns the dig speed using the current tool on the block a_Block.
+	Returns one if using hand.
+	If the player is using a tool that is good to break the block the value is higher.
+	If he has an enchanted tool with efficiency or he has a haste or mining fatique effect it gets multiplied by a specific factor depending on the strength of the effect or enchantment.
+	In he is in water it gets divided by 5 except his tool is enchanted with aqa affinity.
+	If he is not on ground it also gets divided by 5. */
+	float GetDigSpeed(BLOCKTYPE a_Block);
+
 } ;  // tolua_export

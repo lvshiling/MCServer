@@ -3,6 +3,7 @@
 
 #include "BlockHandler.h"
 #include "MetaRotator.h"
+#include "../EffectID.h"
 
 
 
@@ -27,30 +28,30 @@ public:
 		return true;
 	}
 
-	virtual void OnUse(cChunkInterface & a_ChunkInterface, cWorldInterface & a_WorldInterface, cPlayer * a_Player, int a_BlockX, int a_BlockY, int a_BlockZ, eBlockFace a_BlockFace, int a_CursorX, int a_CursorY, int a_CursorZ) override
+	virtual bool OnUse(cChunkInterface & a_ChunkInterface, cWorldInterface & a_WorldInterface, cPlayer & a_Player, int a_BlockX, int a_BlockY, int a_BlockZ, eBlockFace a_BlockFace, int a_CursorX, int a_CursorY, int a_CursorZ) override
 	{
 		if (m_BlockType == E_BLOCK_IRON_TRAPDOOR)
 		{
 			// Iron doors can only be toggled by redstone, not by right-clicking
-			return;
+			return false;
 		}
 
 		// Flip the ON bit on / off using the XOR bitwise operation
-		NIBBLETYPE Meta = (a_ChunkInterface.GetBlockMeta(a_BlockX, a_BlockY, a_BlockZ) ^ 0x04);
+		NIBBLETYPE Meta = (a_ChunkInterface.GetBlockMeta({a_BlockX, a_BlockY, a_BlockZ}) ^ 0x04);
 		a_ChunkInterface.SetBlockMeta(a_BlockX, a_BlockY, a_BlockZ, Meta);
-		
-		cWorld * World = (cWorld *) &a_WorldInterface;
-		World->BroadcastSoundParticleEffect(1003, a_BlockX, a_BlockY, a_BlockZ, 0, a_Player->GetClientHandle());
+		a_WorldInterface.GetBroadcastManager().BroadcastSoundParticleEffect(EffectID::SFX_RANDOM_FENCE_GATE_OPEN, { a_BlockX, a_BlockY, a_BlockZ }, 0, a_Player.GetClientHandle());
+
+		return true;
 	}
 
-	virtual void OnCancelRightClick(cChunkInterface & a_ChunkInterface, cWorldInterface & a_WorldInterface, cPlayer * a_Player, int a_BlockX, int a_BlockY, int a_BlockZ, eBlockFace a_BlockFace) override
+	virtual void OnCancelRightClick(cChunkInterface & a_ChunkInterface, cWorldInterface & a_WorldInterface, cPlayer & a_Player, int a_BlockX, int a_BlockY, int a_BlockZ, eBlockFace a_BlockFace) override
 	{
 		UNUSED(a_ChunkInterface);
 		a_WorldInterface.SendBlockTo(a_BlockX, a_BlockY, a_BlockZ, a_Player);
 	}
 
 	virtual bool GetPlacementBlockTypeMeta(
-		cChunkInterface & a_ChunkInterface, cPlayer * a_Player,
+		cChunkInterface & a_ChunkInterface, cPlayer & a_Player,
 		int a_BlockX, int a_BlockY, int a_BlockZ, eBlockFace a_BlockFace,
 		int a_CursorX, int a_CursorY, int a_CursorZ,
 		BLOCKTYPE & a_BlockType, NIBBLETYPE & a_BlockMeta
@@ -65,7 +66,7 @@ public:
 		}
 		return true;
 	}
-	
+
 	inline static NIBBLETYPE BlockFaceToMetaData(eBlockFace a_BlockFace)
 	{
 		switch (a_BlockFace)
@@ -82,6 +83,7 @@ public:
 				return 0;
 			}
 		}
+		UNREACHABLE("Unsupported block face");
 	}
 
 	inline static eBlockFace BlockMetaDataToBlockFace(NIBBLETYPE a_Meta)
@@ -110,6 +112,21 @@ public:
 		a_Chunk.UnboundedRelGetBlockType(a_RelX, a_RelY, a_RelZ, BlockIsOn);
 
 		return ((a_RelY > 0) && cBlockInfo::IsSolid(BlockIsOn));
+	}
+
+	virtual ColourID GetMapBaseColourID(NIBBLETYPE a_Meta) override
+	{
+		UNUSED(a_Meta);
+		switch (m_BlockType)
+		{
+			case E_BLOCK_TRAPDOOR: return 13;
+			case E_BLOCK_IRON_TRAPDOOR: return 6;
+			default:
+			{
+				ASSERT(!"Unhandled blocktype in trapdoor handler!");
+				return 0;
+			}
+		}
 	}
 };
 

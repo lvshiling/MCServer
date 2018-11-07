@@ -1,12 +1,4 @@
 
-// ItemChest.h
-
-// Declares the cItemChestHandler class representing the cItemHandler descendant responsible for chests
-
-
-
-
-
 #pragma once
 
 #include "ItemHandler.h"
@@ -27,6 +19,8 @@ public:
 	}
 
 
+	/** We need an OnPlayerPlace override because we're processing neighbor chests and changing their metas,
+	the parent class cannot do that. */
 	virtual bool OnPlayerPlace(
 		cWorld & a_World, cPlayer & a_Player, const cItem & a_EquippedItem,
 		int a_BlockX, int a_BlockY, int a_BlockZ, eBlockFace a_BlockFace,
@@ -38,7 +32,7 @@ public:
 			// Clicked in air
 			return false;
 		}
-	
+
 		if ((a_BlockY < 0) || (a_BlockY >= cChunkDef::Height))
 		{
 			// The clicked block is outside the world, ignore this call altogether (#128)
@@ -49,34 +43,28 @@ public:
 		BLOCKTYPE ClickedBlock;
 		NIBBLETYPE ClickedBlockMeta;
 		a_World.GetBlockTypeMeta(a_BlockX, a_BlockY, a_BlockZ, ClickedBlock, ClickedBlockMeta);
-		if (
-			BlockHandler(ClickedBlock)->DoesIgnoreBuildCollision() ||
-			BlockHandler(ClickedBlock)->DoesIgnoreBuildCollision(&a_Player, ClickedBlockMeta)
-		)
+		cChunkInterface ChunkInterface(a_World.GetChunkMap());
+		if (BlockHandler(ClickedBlock)->DoesIgnoreBuildCollision(ChunkInterface, { a_BlockX, a_BlockY, a_BlockZ }, a_Player, ClickedBlockMeta))
 		{
-			cChunkInterface ChunkInterface(a_World.GetChunkMap());
-			BlockHandler(ClickedBlock)->OnDestroyedByPlayer(ChunkInterface, a_World, &a_Player, a_BlockX, a_BlockY, a_BlockZ);
+			BlockHandler(ClickedBlock)->OnDestroyedByPlayer(ChunkInterface, a_World, a_Player, a_BlockX, a_BlockY, a_BlockZ);
 		}
 		else
 		{
 			AddFaceDirection(a_BlockX, a_BlockY, a_BlockZ, a_BlockFace);
-			
+
 			if ((a_BlockY < 0) || (a_BlockY >= cChunkDef::Height))
 			{
 				// The block is being placed outside the world, ignore this packet altogether (#128)
 				return false;
 			}
-			
+
 			NIBBLETYPE PlaceMeta;
 			BLOCKTYPE PlaceBlock;
 			a_World.GetBlockTypeMeta(a_BlockX, a_BlockY, a_BlockZ, PlaceBlock, PlaceMeta);
 
 			// Clicked on side of block, make sure that placement won't be cancelled if there is a slab able to be double slabbed.
 			// No need to do combinability (dblslab) checks, client will do that here.
-			if (
-				!BlockHandler(PlaceBlock)->DoesIgnoreBuildCollision() &&
-				!BlockHandler(PlaceBlock)->DoesIgnoreBuildCollision(&a_Player, PlaceMeta)
-			)
+			if (BlockHandler(ClickedBlock)->DoesIgnoreBuildCollision(ChunkInterface, { a_BlockX, a_BlockY, a_BlockZ }, a_Player, ClickedBlockMeta))
 			{
 				// Tried to place a block into another?
 				// Happens when you place a block aiming at side of block with a torch on it or stem beside it
@@ -118,34 +106,32 @@ public:
 			}  // for j
 		}  // for i
 
-		// If there's no chest neighbor, place the single block chest and bail out:
+		// Get the meta of the placed chest; take existing neighbors into account:
 		BLOCKTYPE ChestBlockType = static_cast<BLOCKTYPE>(m_ItemType);
-		if (NeighborIdx < 0)
+		NIBBLETYPE Meta;
+		auto yaw = a_Player.GetYaw();
+		switch (NeighborIdx)
 		{
-			NIBBLETYPE Meta = cBlockChestHandler::PlayerYawToMetaData(a_Player.GetYaw());
-			return a_Player.PlaceBlock(a_BlockX, a_BlockY, a_BlockZ, ChestBlockType, Meta);
-		}
-
-		// There is a neighbor to which we need to adjust
-		double yaw = a_Player.GetYaw();
-		if ((NeighborIdx == 0) || (NeighborIdx == 2))
-		{
-			// The neighbor is in the X axis, form a X-axis-aligned dblchest:
-			NIBBLETYPE Meta = ((yaw >= -90) && (yaw < 90)) ? E_META_CHEST_FACING_ZM : E_META_CHEST_FACING_ZP;
-
-			// Place the new chest:
-			if (!a_Player.PlaceBlock(a_BlockX, a_BlockY, a_BlockZ, ChestBlockType, Meta))
+			case 0:
+			case 2:
 			{
-				return false;
+				// The neighbor is in the X axis, form a X-axis-aligned dblchest:
+				Meta = ((yaw >= -90) && (yaw < 90)) ? E_META_CHEST_FACING_ZM : E_META_CHEST_FACING_ZP;
+				break;
 			}
-
-			// Adjust the existing chest:
-			a_World.FastSetBlock(a_BlockX + CrossCoords[NeighborIdx].x, a_BlockY, a_BlockZ + CrossCoords[NeighborIdx].z, ChestBlockType, Meta);
-			return true;
-		}
-
-		// The neighbor is in the Z axis, form a Z-axis-aligned dblchest:
-		NIBBLETYPE Meta = (yaw < 0) ? E_META_CHEST_FACING_XM : E_META_CHEST_FACING_XP;
+			case 1:
+			case 3:
+			{
+				// The neighbor is in the Z axis, form a Z-axis-aligned dblchest:
+				Meta = (yaw < 0) ? E_META_CHEST_FACING_XM : E_META_CHEST_FACING_XP;
+				break;
+			}
+			default:
+			{
+				Meta = cBlockChestHandler::PlayerYawToMetaData(yaw);
+				break;
+			}
+		}  // switch (NeighborIdx)
 
 		// Place the new chest:
 		if (!a_Player.PlaceBlock(a_BlockX, a_BlockY, a_BlockZ, ChestBlockType, Meta))
@@ -153,15 +139,20 @@ public:
 			return false;
 		}
 
-		// Adjust the existing chest:
-		a_World.FastSetBlock(a_BlockX + CrossCoords[NeighborIdx].x, a_BlockY, a_BlockZ + CrossCoords[NeighborIdx].z, ChestBlockType, Meta);
+		// Adjust the existing chest, if any:
+		if (NeighborIdx != -1)
+		{
+			a_World.FastSetBlock(a_BlockX + CrossCoords[NeighborIdx].x, a_BlockY, a_BlockZ + CrossCoords[NeighborIdx].z, ChestBlockType, Meta);
+		}
+
+		// Remove the "placed" item:
+		if (a_Player.IsGameModeSurvival())
+		{
+			a_Player.GetInventory().RemoveOneEquippedItem();
+		}
 		return true;
 	}
 
 private:
 	cItemChestHandler(const cItemChestHandler &) = delete;
 };
-
-
-
-

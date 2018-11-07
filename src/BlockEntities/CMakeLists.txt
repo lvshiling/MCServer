@@ -1,12 +1,10 @@
 
-cmake_minimum_required (VERSION 2.6)
-project (MCServer)
-
-include_directories ("${PROJECT_SOURCE_DIR}/../")
-
 SET (SRCS
 	BeaconEntity.cpp
+	BedEntity.cpp
 	BlockEntity.cpp
+	BlockEntityWithItems.cpp
+	BrewingstandEntity.cpp
 	ChestEntity.cpp
 	CommandBlockEntity.cpp
 	DispenserEntity.cpp
@@ -20,12 +18,15 @@ SET (SRCS
 	MobHeadEntity.cpp
 	MobSpawnerEntity.cpp
 	NoteEntity.cpp
-	SignEntity.cpp)
+	SignEntity.cpp
+)
 
 SET (HDRS
 	BeaconEntity.h
+	BedEntity.h
 	BlockEntity.h
 	BlockEntityWithItems.h
+	BrewingstandEntity.h
 	ChestEntity.h
 	CommandBlockEntity.h
 	DispenserEntity.h
@@ -39,13 +40,10 @@ SET (HDRS
 	MobHeadEntity.h
 	MobSpawnerEntity.h
 	NoteEntity.h
-	SignEntity.h)
-
-if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang")
-	set_source_files_properties(BeaconEntity.cpp PROPERTIES COMPILE_FLAGS "-Wno-error=conversion -Wno-error=switch-enum")
-	set_source_files_properties(NoteEntity.cpp PROPERTIES COMPILE_FLAGS "-Wno-error=conversion -Wno-error=sign-conversion")
-endif()
+	SignEntity.h
+)
 
 if(NOT MSVC)
 	add_library(BlockEntities ${SRCS} ${HDRS})
+	target_link_libraries(BlockEntities fmt::fmt)
 endif()

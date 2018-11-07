@@ -11,7 +11,7 @@ class cOverridesSettingsRepository : public cSettingsRepositoryInterface
 public:
 	cOverridesSettingsRepository(std::unique_ptr<cSettingsRepositoryInterface> a_Main, std::unique_ptr<cSettingsRepositoryInterface> a_Overrides);
 
-	virtual ~cOverridesSettingsRepository() = default;
+	virtual ~cOverridesSettingsRepository() override = default;
 
 	virtual bool KeyExists(const AString keyname) const override;
 
@@ -20,7 +20,7 @@ public:
 	virtual int AddKeyName(const AString & keyname) override;
 
 	virtual bool AddKeyComment(const AString & keyname, const AString & comment) override;
-	
+
 	virtual AString GetKeyComment(const AString & keyname, const int commentID) const override;
 
 	virtual bool DeleteKeyComment(const AString & keyname, const int commentID) override;

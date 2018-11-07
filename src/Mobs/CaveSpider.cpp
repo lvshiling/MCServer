@@ -8,7 +8,7 @@
 
 
 cCaveSpider::cCaveSpider(void) :
-	super("CaveSpider", mtCaveSpider, "mob.spider.say", "mob.spider.death", 0.7, 0.5)
+	super("CaveSpider", mtCaveSpider, "entity.spider.hurt", "entity.spider.death", 0.7, 0.5)
 {
 }
 
@@ -19,6 +19,11 @@ cCaveSpider::cCaveSpider(void) :
 void cCaveSpider::Tick(std::chrono::milliseconds a_Dt, cChunk & a_Chunk)
 {
 	super::Tick(a_Dt, a_Chunk);
+	if (!IsTicking())
+	{
+		// The base class tick destroyed us
+		return;
+	}
 
 	m_EMPersonality = (GetWorld()->GetTimeOfDay() < (12000 + 1000)) ? PASSIVE : AGGRESSIVE;
 }
@@ -27,15 +32,19 @@ void cCaveSpider::Tick(std::chrono::milliseconds a_Dt, cChunk & a_Chunk)
 
 
 
-void cCaveSpider::Attack(std::chrono::milliseconds a_Dt)
+bool cCaveSpider::Attack(std::chrono::milliseconds a_Dt)
 {
-	super::Attack(a_Dt);
-	
-	if (m_Target->IsPawn())
+	if (!super::Attack(a_Dt))
+	{
+		return false;
+	}
+
+	if (GetTarget()->IsPawn())
 	{
 		// TODO: Easy = no poison, Medium = 7 seconds, Hard = 15 seconds
-		static_cast<cPawn *>(m_Target)->AddEntityEffect(cEntityEffect::effPoison, 7 * 20, 0);
+		static_cast<cPawn *>(GetTarget())->AddEntityEffect(cEntityEffect::effPoison, 7 * 20, 0);
 	}
+	return true;
 }
 
 

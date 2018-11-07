@@ -1,8 +1,8 @@
 #pragma once
 
 #include "BlockHandler.h"
-#include "MetaRotator.h"
-#include "Bindings/PluginManager.h"
+
+
 
 
 
@@ -14,10 +14,9 @@ public:
 		: cBlockHandler(a_BlockType)
 	{
 	}
-	
-	
+
 	virtual bool GetPlacementBlockTypeMeta(
-		cChunkInterface & a_ChunkInterface, cPlayer * a_Player,
+		cChunkInterface & a_ChunkInterface, cPlayer & a_Player,
 		int a_BlockX, int a_BlockY, int a_BlockZ, eBlockFace a_BlockFace,
 		int a_CursorX, int a_CursorY, int a_CursorZ,
 		BLOCKTYPE & a_BlockType, NIBBLETYPE & a_BlockMeta
@@ -26,7 +25,7 @@ public:
 		// TODO: Disallow placement where the vine doesn't attach to something properly
 		BLOCKTYPE BlockType = 0;
 		NIBBLETYPE BlockMeta;
-		a_ChunkInterface.GetBlockTypeMeta(a_BlockX, a_BlockY, a_BlockZ, BlockType, BlockMeta);
+		a_ChunkInterface.GetBlockTypeMeta({a_BlockX, a_BlockY, a_BlockZ}, BlockType, BlockMeta);
 		if (BlockType == m_BlockType)
 		{
 			a_BlockMeta = BlockMeta | DirectionToMetaData(a_BlockFace);
@@ -39,13 +38,11 @@ public:
 		return true;
 	}
 
-
 	virtual void ConvertToPickups(cItems & a_Pickups, NIBBLETYPE a_BlockMeta) override
 	{
 		// Reset meta to zero
 		a_Pickups.push_back(cItem(E_BLOCK_VINES, 1, 0));
 	}
-
 
 	static NIBBLETYPE DirectionToMetaData(char a_BlockFace)
 	{
@@ -59,7 +56,6 @@ public:
 		}
 	}
 
-
 	static char MetaDataToDirection(NIBBLETYPE a_MetaData)
 	{
 		switch (a_MetaData)
@@ -72,15 +68,20 @@ public:
 		}
 	}
 
-
-	/// Returns true if the specified block type is good for vines to attach to
+	/** Returns true if the specified block type is good for vines to attach to */
 	static bool IsBlockAttachable(BLOCKTYPE a_BlockType)
 	{
 		switch (a_BlockType)
 		{
-			case E_BLOCK_GLASS:
-			case E_BLOCK_STAINED_GLASS:
 			case E_BLOCK_CHEST:
+			case E_BLOCK_ENDER_CHEST:
+			case E_BLOCK_GLASS:
+			case E_BLOCK_PISTON:
+			case E_BLOCK_PISTON_EXTENSION:
+			case E_BLOCK_REDSTONE_REPEATER_OFF:
+			case E_BLOCK_REDSTONE_REPEATER_ON:
+			case E_BLOCK_STAINED_GLASS:
+			case E_BLOCK_STICKY_PISTON:
 			case E_BLOCK_TRAPPED_CHEST:
 			{
 				// You can't attach a vine to this solid blocks.
@@ -93,8 +94,7 @@ public:
 		}
 	}
 
-
-	/// Returns the meta that has the maximum allowable sides of the vine, given the surroundings
+	/** Returns the meta that has the maximum allowable sides of the vine, given the surroundings */
 	NIBBLETYPE GetMaxMeta(cChunk & a_Chunk, int a_RelX, int a_RelY, int a_RelZ)
 	{
 		static const struct
@@ -109,33 +109,32 @@ public:
 			{ 1,  0, 8},  // east,  XP
 		} ;
 		NIBBLETYPE res = 0;
-		for (size_t i = 0; i < ARRAYCOUNT(Coords); i++)
+		for (auto & Coord : Coords)
 		{
 			BLOCKTYPE  BlockType;
 			NIBBLETYPE BlockMeta;
 			if (
-				a_Chunk.UnboundedRelGetBlock(a_RelX + Coords[i].x, a_RelY, a_RelZ + Coords[i].z, BlockType, BlockMeta) &&
+				a_Chunk.UnboundedRelGetBlock(a_RelX + Coord.x, a_RelY, a_RelZ + Coord.z, BlockType, BlockMeta) &&
 				IsBlockAttachable(BlockType)
 			)
 			{
-				res |= Coords[i].Bit;
+				res |= Coord.Bit;
 			}
 		}
 		return res;
 	}
-	
-	
+
 	void Check(cChunkInterface & a_ChunkInterface, cBlockPluginInterface & a_PluginInterface, int a_RelX, int a_RelY, int a_RelZ, cChunk & a_Chunk) override
 	{
 		NIBBLETYPE CurMeta = a_Chunk.GetMeta(a_RelX, a_RelY, a_RelZ);
 		NIBBLETYPE MaxMeta = GetMaxMeta(a_Chunk, a_RelX, a_RelY, a_RelZ);
-		
+
 		// Check if vine above us, add its meta to MaxMeta
 		if ((a_RelY < cChunkDef::Height - 1) && (a_Chunk.GetBlock(a_RelX, a_RelY + 1, a_RelZ) == m_BlockType))
 		{
 			MaxMeta |= a_Chunk.GetMeta(a_RelX, a_RelY + 1, a_RelZ);
 		}
-		
+
 		NIBBLETYPE Common = CurMeta & MaxMeta;  // Neighbors that we have and are legal
 		if (Common != CurMeta)
 		{
@@ -160,22 +159,19 @@ public:
 			// Wake up the simulators for this block:
 			int BlockX = a_RelX + a_Chunk.GetPosX() * cChunkDef::Width;
 			int BlockZ = a_RelZ + a_Chunk.GetPosZ() * cChunkDef::Width;
-			a_Chunk.GetWorld()->GetSimulatorManager()->WakeUp(BlockX, a_RelY, BlockZ, &a_Chunk);
+			a_Chunk.GetWorld()->GetSimulatorManager()->WakeUp({BlockX, a_RelY, BlockZ}, &a_Chunk);
 		}
 	}
 
-
-	virtual bool DoesIgnoreBuildCollision(void) override
+	virtual bool DoesIgnoreBuildCollision(cChunkInterface & a_ChunkInterface, Vector3i a_Pos, cPlayer & a_Player, NIBBLETYPE a_Meta) override
 	{
 		return true;
 	}
-
 
 	virtual bool DoesDropOnUnsuitable(void) override
 	{
 		return false;
 	}
-	
 
 	virtual void OnUpdate(cChunkInterface & a_ChunkInterface, cWorldInterface & a_WorldInterface, cBlockPluginInterface & a_BlockPluginInterface, cChunk & a_Chunk, int a_RelX, int a_RelY, int a_RelZ) override
 	{
@@ -199,31 +195,33 @@ public:
 			}
 		}
 	}
-	
 
 	virtual NIBBLETYPE MetaRotateCCW(NIBBLETYPE a_Meta) override
 	{
 		return ((a_Meta >> 1) | (a_Meta << 3)) & 0x0f;  // Rotate bits to the right
 	}
 
-
 	virtual NIBBLETYPE MetaRotateCW(NIBBLETYPE a_Meta) override
 	{
 		return ((a_Meta << 1) | (a_Meta >> 3)) & 0x0f;  // Rotate bits to the left
 	}
 
-
 	virtual NIBBLETYPE MetaMirrorXY(NIBBLETYPE a_Meta) override
 	{
 		// Bits 2 and 4 stay, bits 1 and 3 swap
-		return (NIBBLETYPE)((a_Meta & 0x0a) | ((a_Meta & 0x01) << 2) | ((a_Meta & 0x04) >> 2));
+		return static_cast<NIBBLETYPE>((a_Meta & 0x0a) | ((a_Meta & 0x01) << 2) | ((a_Meta & 0x04) >> 2));
 	}
-
 
 	virtual NIBBLETYPE MetaMirrorYZ(NIBBLETYPE a_Meta) override
 	{
 		// Bits 1 and 3 stay, bits 2 and 4 swap
-		return (NIBBLETYPE)((a_Meta & 0x05) | ((a_Meta & 0x02) << 2) | ((a_Meta & 0x08) >> 2));
+		return static_cast<NIBBLETYPE>((a_Meta & 0x05) | ((a_Meta & 0x02) << 2) | ((a_Meta & 0x08) >> 2));
+	}
+
+	virtual ColourID GetMapBaseColourID(NIBBLETYPE a_Meta) override
+	{
+		UNUSED(a_Meta);
+		return 7;
 	}
 
 } ;

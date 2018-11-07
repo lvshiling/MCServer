@@ -1,6 +1,4 @@
-
-cmake_minimum_required (VERSION 2.6)
-project (MCServer)
+project (Cuberite)
 
 include_directories ("${PROJECT_SOURCE_DIR}/../")
 
@@ -9,7 +7,8 @@ SET (SRCS
 	BlockDoor.cpp
 	BlockHandler.cpp
 	BlockPiston.cpp
-	ChunkInterface.cpp)
+	ChunkInterface.cpp
+)
 
 SET (HDRS
 	BlockAnvil.h
@@ -27,6 +26,7 @@ SET (HDRS
 	BlockCocoaPod.h
 	BlockCommandBlock.h
 	BlockComparator.h
+	BlockConcretePowder.h
 	BlockCrops.h
 	BlockDeadBush.h
 	BlockDirt.h
@@ -36,6 +36,7 @@ SET (HDRS
 	BlockEnderchest.h
 	BlockEntity.h
 	BlockFarmland.h
+	BlockFence.h
 	BlockFenceGate.h
 	BlockFire.h
 	BlockFlower.h
@@ -54,12 +55,15 @@ SET (HDRS
 	BlockLilypad.h
 	BlockMelon.h
 	BlockMobHead.h
+	BlockMobSpawner.h
 	BlockMushroom.h
 	BlockMycelium.h
+	BlockNetherrack.h
 	BlockNetherWart.h
 	BlockOre.h
 	BlockPiston.h
 	BlockPlanks.h
+	BlockPlant.h
 	BlockPluginInterface.h
 	BlockPortal.h
 	BlockPressurePlate.h
@@ -72,6 +76,7 @@ SET (HDRS
 	BlockRedstoneTorch.h
 	BlockSand.h
 	BlockSapling.h
+	BlockSeaLantern.h
 	BlockSideways.h
 	BlockSignPost.h
 	BlockSlab.h
@@ -80,8 +85,8 @@ SET (HDRS
 	BlockStems.h
 	BlockStone.h
 	BlockSugarcane.h
-	BlockTNT.h
 	BlockTallGrass.h
+	BlockTNT.h
 	BlockTorch.h
 	BlockTrapdoor.h
 	BlockTripwire.h
@@ -92,14 +97,12 @@ SET (HDRS
 	BroadcastInterface.h
 	ChunkInterface.h
 	ClearMetaOnDrop.h
+	GetHandlerCompileTimeTemplate.h
 	MetaRotator.h
-	WorldInterface.h)
-
-if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang")
-	set_source_files_properties(BlockHandler.cpp PROPERTIES COMPILE_FLAGS "-Wno-error=old-style-cast")
-	set_source_files_properties(BlockPiston.cpp PROPERTIES COMPILE_FLAGS "-Wno-error=old-style-cast")
-endif()
+	WorldInterface.h
+)
 
 if(NOT MSVC)
 	add_library(Blocks ${SRCS} ${HDRS})
+	target_link_libraries(Blocks fmt::fmt)
 endif()

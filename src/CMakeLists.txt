@@ -1,16 +1,15 @@
-cmake_minimum_required (VERSION 2.8.2)
-project (MCServer)
+project (Cuberite)
 
 
 include_directories (SYSTEM "${CMAKE_CURRENT_SOURCE_DIR}/../lib/")
 include_directories (SYSTEM "${CMAKE_CURRENT_SOURCE_DIR}/../lib/jsoncpp/include")
-include_directories (SYSTEM "${CMAKE_CURRENT_SOURCE_DIR}/../lib/polarssl/include")
+include_directories (SYSTEM "${CMAKE_CURRENT_SOURCE_DIR}/../lib/mbedtls/include")
 include_directories (SYSTEM "${CMAKE_CURRENT_SOURCE_DIR}/../lib/libevent/include")
 
 set(FOLDERS
-	OSSupport HTTPServer Items Blocks Protocol Generating PolarSSL++ Bindings
-	WorldStorage Mobs Entities Simulator BlockEntities UI Generating/Prefabs
-	Noise
+	OSSupport HTTP Items Blocks Protocol Generating mbedTLS++ Bindings
+	WorldStorage Mobs Entities Simulator Simulator/IncrementalRedstoneSimulator
+	BlockEntities UI Noise
 )
 
 SET (SRCS
@@ -18,6 +17,7 @@ SET (SRCS
 	BlockArea.cpp
 	BlockID.cpp
 	BlockInfo.cpp
+	BrewingRecipes.cpp
 	Broadcaster.cpp
 	BoundingBox.cpp
 	ByteBuffer.cpp
@@ -28,6 +28,7 @@ SET (SRCS
 	ChunkSender.cpp
 	ChunkStay.cpp
 	ClientHandle.cpp
+	Color.cpp
 	CommandOutput.cpp
 	CompositeChat.cpp
 	CraftingRecipes.cpp
@@ -54,6 +55,7 @@ SET (SRCS
 	MobProximityCounter.cpp
 	MobSpawner.cpp
 	MonsterConfig.cpp
+	NetherPortalScanner.cpp
 	OverridesSettingsRepository.cpp
 	ProbabDistrib.cpp
 	RankManager.cpp
@@ -62,10 +64,12 @@ SET (SRCS
 	Scoreboard.cpp
 	Server.cpp
 	SetChunkData.cpp
+	SpawnPrepare.cpp
 	Statistics.cpp
 	StringCompression.cpp
 	StringUtils.cpp
 	Tracer.cpp
+	UUID.cpp
 	VoronoiMap.cpp
 	WebAdmin.cpp
 	World.cpp
@@ -80,8 +84,9 @@ SET (HDRS
 	BlockInServerPluginInterface.h
 	BlockInfo.h
 	BlockTracer.h
-	Broadcaster.h
+	BrewingRecipes.h
 	BoundingBox.h
+	BuildInfo.h
 	BuildInfo.h.cmake
 	ByteBuffer.h
 	ChatColor.h
@@ -93,28 +98,33 @@ SET (HDRS
 	ChunkSender.h
 	ChunkStay.h
 	ClientHandle.h
+	Color.h
 	CommandOutput.h
 	CompositeChat.h
 	CraftingRecipes.h
 	Cuboid.h
 	DeadlockDetect.h
 	Defines.h
+	EffectID.h
 	Enchantments.h
 	Endianness.h
 	FastRandom.h
 	ForEachChunkProvider.h
 	FurnaceRecipe.h
+	FunctionRef.h
 	Globals.h
 	IniFile.h
 	Inventory.h
 	Item.h
 	ItemGrid.h
+	LazyArray.h
 	LightingThread.h
 	LineBlockTracer.h
 	LinearInterpolation.h
 	LinearUpscale.h
 	Logger.h
 	LoggerListeners.h
+	LoggerSimple.h
 	Map.h
 	MapManager.h
 	Matrix4.h
@@ -124,6 +134,8 @@ SET (HDRS
 	MobProximityCounter.h
 	MobSpawner.h
 	MonsterConfig.h
+	NetherPortalScanner.h
+	OpaqueWorld.h
 	OverridesSettingsRepository.h
 	ProbabDistrib.h
 	RankManager.h
@@ -133,10 +145,13 @@ SET (HDRS
 	Server.h
 	SetChunkData.h
 	SettingsRepositoryInterface.h
+	SpawnPrepare.h
 	Statistics.h
+	Stopwatch.h
 	StringCompression.h
 	StringUtils.h
 	Tracer.h
+	UUID.h
 	Vector3.h
 	VoronoiMap.h
 	WebAdmin.h
@@ -144,7 +159,10 @@ SET (HDRS
 	XMLParser.h
 )
 
-include_directories(".")
+file(WRITE "${CMAKE_BINARY_DIR}/include/Globals.h"
+	"/* This file allows Globals.h to be included with an absolute path */\n#include \"${PROJECT_SOURCE_DIR}/Globals.h\"\n")
+
+include_directories("${CMAKE_BINARY_DIR}/include")
 include_directories ("${CMAKE_CURRENT_SOURCE_DIR}/../lib/sqlite")
 include_directories ("${CMAKE_CURRENT_SOURCE_DIR}/../lib/SQLiteCpp/include")
 include_directories (SYSTEM "${CMAKE_CURRENT_SOURCE_DIR}/../lib/TCLAP/include")
@@ -152,41 +170,16 @@ include_directories (SYSTEM "${CMAKE_CURRENT_SOURCE_DIR}/../lib/TCLAP/include")
 configure_file("BuildInfo.h.cmake" "${CMAKE_CURRENT_SOURCE_DIR}/BuildInfo.h")
 
 if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang")
-	set_source_files_properties(BiomeDef.cpp PROPERTIES COMPILE_FLAGS "-Wno-error=switch-enum")
-	set_source_files_properties(BlockArea.cpp PROPERTIES COMPILE_FLAGS "-Wno-error=sign-conversion")
 	set_source_files_properties(BlockID.cpp PROPERTIES COMPILE_FLAGS "-Wno-error=global-constructors")
-	set_source_files_properties(BoundingBox.cpp PROPERTIES COMPILE_FLAGS "-Wno-error=global-constructors -Wno-error=float-equal")
-	set_source_files_properties(ByteBuffer.cpp PROPERTIES COMPILE_FLAGS "-Wno-error=sign-conversion -Wno-error=old-style-cast -Wno-error=global-constructors")
-	set_source_files_properties(Chunk.cpp PROPERTIES COMPILE_FLAGS "-Wno-error=old-style-cast")
-	set_source_files_properties(ChunkData.cpp PROPERTIES COMPILE_FLAGS "-Wno-error=sign-conversion -Wno-error=old-style-cast")
-	set_source_files_properties(ChunkMap.cpp PROPERTIES COMPILE_FLAGS "-Wno-error=shadow -Wno-error=sign-conversion -Wno-error=old-style-cast")
-	set_source_files_properties(ClientHandle.cpp PROPERTIES COMPILE_FLAGS "-Wno-error=conversion -Wno-error=sign-conversion -Wno-error=global-constructors -Wno-error=old-style-cast")
-	set_source_files_properties(CompositeChat.cpp PROPERTIES COMPILE_FLAGS "-Wno-error=global-constructors -Wno-error=missing-variable-declarations")
-	set_source_files_properties(Enchantments.cpp PROPERTIES COMPILE_FLAGS "-Wno-error=old-style-cast")
-	set_source_files_properties(IniFile.cpp PROPERTIES COMPILE_FLAGS "-Wno-error=sign-conversion -Wno-error=old-style-cast")
-	set_source_files_properties(Inventory.cpp PROPERTIES COMPILE_FLAGS "-Wno-error=conversion")
-	set_source_files_properties(Item.cpp PROPERTIES COMPILE_FLAGS "-Wno-error=conversion -Wno-error=old-style-cast")
-	set_source_files_properties(ItemGrid.cpp PROPERTIES COMPILE_FLAGS "-Wno-error=conversion")
-	set_source_files_properties(LightingThread.cpp PROPERTIES COMPILE_FLAGS "-Wno-error=conversion -Wno-error=sign-conversion")
-	set_source_files_properties(LinearInterpolation.cpp PROPERTIES COMPILE_FLAGS "-Wno-error=old-style-cast")
-	set_source_files_properties(Map.cpp PROPERTIES COMPILE_FLAGS "-Wno-error=conversion -Wno-error=old-style-cast")
-	set_source_files_properties(MobProximityCounter.cpp PROPERTIES COMPILE_FLAGS "-Wno-error=float-equal")
-	set_source_files_properties(MobSpawner.cpp PROPERTIES COMPILE_FLAGS "-Wno-error=switch-enum")
-	set_source_files_properties(RCONServer.cpp PROPERTIES COMPILE_FLAGS "-Wno-error=sign-conversion")
-	set_source_files_properties(Root.cpp PROPERTIES COMPILE_FLAGS "-Wno-error=sign-conversion -Wno-error=shadow -Wno-error=old-style-cast")
-	set_source_files_properties(Server.cpp PROPERTIES COMPILE_FLAGS "-Wno-error=old-style-cast")
+	set_source_files_properties(ByteBuffer.cpp PROPERTIES COMPILE_FLAGS "-Wno-error=global-constructors")
+	set_source_files_properties(ClientHandle.cpp PROPERTIES COMPILE_FLAGS "-Wno-error=global-constructors ")
 	set_source_files_properties(Statistics.cpp PROPERTIES COMPILE_FLAGS "-Wno-error=global-constructors")
-	set_source_files_properties(StringCompression.cpp PROPERTIES COMPILE_FLAGS "-Wno-error=old-style-cast")
-	set_source_files_properties(StringUtils.cpp PROPERTIES COMPILE_FLAGS "-Wno-error=conversion -Wno-error=old-style-cast")
-	set_source_files_properties(Tracer.cpp PROPERTIES COMPILE_FLAGS "-Wno-error=sign-conversion")
-	set_source_files_properties(World.cpp PROPERTIES COMPILE_FLAGS "-Wno-error=sign-conversion -Wno-error=old-style-cast")
-	set_source_files_properties(main.cpp PROPERTIES COMPILE_FLAGS "-Wno-error=missing-variable-declarations -Wno-error=missing-prototypes")
 endif()
 
 if (NOT MSVC)
 	# Bindings need to reference other folders, so they are done here instead
 	# lib dependencies are not included
-	include_directories ("${CMAKE_CURRENT_SOURCE_DIR}/../lib/polarssl/include")
+	include_directories ("${CMAKE_CURRENT_SOURCE_DIR}/../lib/mbedtls/include")
 
 	foreach(folder ${FOLDERS})
 		add_subdirectory(${folder})
@@ -208,14 +201,10 @@ if (NOT MSVC)
 
 	# If building a windows version, but not using MSVC, add the resources directly to the makefile:
 	if (WIN32)
-		list(APPEND SOURCE "Resources/MCServer.rc")
+		list(APPEND SOURCE "Resources/Cuberite.rc")
 	endif()
 else ()
 	# MSVC-specific handling: Put all files into one project, separate by the folders:
-
-	# Add the MSVC-specific LeakFinder sources:
-	list (APPEND SRCS LeakFinder.cpp StackWalker.cpp)
-	list (APPEND HDRS LeakFinder.h StackWalker.h MemoryLeak.h)
 
 	source_group(Bindings FILES "Bindings/Bindings.cpp" "Bindings/Bindings.h")
 
@@ -246,6 +235,10 @@ else ()
 		foreach (hdr ${FOLDER_HDRS})
 			list(APPEND SOURCE "${folder}/${hdr}")
 		endforeach(hdr)
+
+		# Include this folder's CMakeLists.txt in the project:
+		list(APPEND SOURCE "${folder}/CMakeLists.txt")
+		source_group("${folder}" FILES "${folder}/CMakeLists.txt")
 	endforeach(folder)
 
 	list(APPEND SOURCE "${SRCS}")
@@ -255,8 +248,6 @@ else ()
 	includefolder("Resources")
 	source_group("" FILES ${SOURCE})
 
-	include_directories("${PROJECT_SOURCE_DIR}")
-
 	# Precompiled headers (1st part)
 	SET_SOURCE_FILES_PROPERTIES(
 		Globals.cpp PROPERTIES COMPILE_FLAGS "/Yc\"Globals.h\""
@@ -265,10 +256,7 @@ else ()
 	SET_SOURCE_FILES_PROPERTIES(
 		Bindings/Bindings.cpp PROPERTIES COMPILE_FLAGS "/Yc\"string.h\" /Fp\"$(IntDir)/Bindings.pch\""
 	)
-	SET_SOURCE_FILES_PROPERTIES(
-		"StackWalker.cpp LeakFinder.cpp" PROPERTIES COMPILE_FLAGS "/Yc\"Globals.h\""
-	)
-	list(APPEND SOURCE "Resources/MCServer.rc")
+	list(APPEND SOURCE "Resources/Cuberite.rc")
 
 	# Make MSVC generate the PDB files even for the release build:
 	set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} /Zi")
@@ -297,76 +285,84 @@ foreach(arg ${ALLFILES})
 endforeach()
 FILE(WRITE "AllFiles.lst" "${ALLFILESLINES}")
 
-
-set(EXECUTABLE MCServer)
-
 if (MSVC)
 	get_directory_property(BINDING_OUTPUTS DIRECTORY "Bindings" DEFINITION BINDING_OUTPUTS)
 	get_directory_property(BINDING_DEPENDENCIES DIRECTORY "Bindings" DEFINITION BINDING_DEPENDENCIES)
-	
+
 	# The paths in BINDING_DEPENDENCIES are relative to the Bindings folder, convert them relative to this folder:
 	foreach (dep ${BINDING_DEPENDENCIES})
 		list (APPEND BINDINGS_DEPENDENCIES "Bindings/${dep}")
 	endforeach(dep)
 
-	ADD_CUSTOM_COMMAND(
-		OUTPUT ${BINDING_OUTPUTS}
+	if (USE_SYSTEM_LUA)
+		ADD_CUSTOM_COMMAND(
+			OUTPUT ${BINDING_OUTPUTS}
+			COMMAND lua BindingsProcessor.lua
+			WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/Bindings/
+			DEPENDS ${BINDINGS_DEPENDENCIES}
+		)
+	else()
+		ADD_CUSTOM_COMMAND(
+			OUTPUT ${BINDING_OUTPUTS}
 
-		# Copy the Lua DLL into the Bindings folder, so that tolua can run from there:
-		COMMAND ${CMAKE_COMMAND} -E copy_if_different ${CMAKE_SOURCE_DIR}/MCServer/lua51.dll ./lua51.dll
-
-		# Regenerate bindings:
-		COMMAND tolua -L BindingsProcessor.lua -o Bindings.cpp -H Bindings.h AllToLua.pkg
-		WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/Bindings/
-
-		# add any new generation dependencies here
-		DEPENDS ${BINDINGS_DEPENDENCIES}
-	)
+			# Regenerate bindings:
+			COMMAND luaexe BindingsProcessor.lua
+			WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/Bindings/
+			DEPENDS ${BINDINGS_DEPENDENCIES} luaexe
+		)
+	endif()
 endif()
 
-add_executable(${EXECUTABLE} ${SOURCE})
 
+add_executable(${CMAKE_PROJECT_NAME} ${SOURCE})
 
-# Output the executable into the $/MCServer folder, so that it has access to external resources:
-set(EXECUTABLE_OUTPUT_PATH ${CMAKE_SOURCE_DIR}/MCServer)
-SET_TARGET_PROPERTIES(${EXECUTABLE} PROPERTIES
-	RUNTIME_OUTPUT_DIRECTORY_DEBUG          ${CMAKE_SOURCE_DIR}/MCServer
-	RUNTIME_OUTPUT_DIRECTORY_RELEASE        ${CMAKE_SOURCE_DIR}/MCServer
-	RUNTIME_OUTPUT_DIRECTORY_DEBUGPROFILE   ${CMAKE_SOURCE_DIR}/MCServer
-	RUNTIME_OUTPUT_DIRECTORY_RELEASEPROFILE ${CMAKE_SOURCE_DIR}/MCServer
+# Output the executable into the $/Server folder, so that it has access to external resources:
+SET_TARGET_PROPERTIES(${CMAKE_PROJECT_NAME} PROPERTIES
+	RUNTIME_OUTPUT_DIRECTORY                ${CMAKE_SOURCE_DIR}/Server
+	RUNTIME_OUTPUT_DIRECTORY_DEBUG          ${CMAKE_SOURCE_DIR}/Server
+	RUNTIME_OUTPUT_DIRECTORY_RELEASE        ${CMAKE_SOURCE_DIR}/Server
+	RUNTIME_OUTPUT_DIRECTORY_RELWITHDEBINFO ${CMAKE_SOURCE_DIR}/Server
+	RUNTIME_OUTPUT_DIRECTORY_MINSIZEREL     ${CMAKE_SOURCE_DIR}/Server
+	RUNTIME_OUTPUT_DIRECTORY_DEBUGPROFILE   ${CMAKE_SOURCE_DIR}/Server
+	RUNTIME_OUTPUT_DIRECTORY_RELEASEPROFILE ${CMAKE_SOURCE_DIR}/Server
 )
 
-
 # Make the debug executable have a "_debug" suffix
-SET_TARGET_PROPERTIES(${EXECUTABLE} PROPERTIES DEBUG_POSTFIX "_debug")
+SET_TARGET_PROPERTIES(${CMAKE_PROJECT_NAME} PROPERTIES DEBUG_POSTFIX "_debug")
 
 # Make the profiled executables have a "_profile" postfix
-SET_TARGET_PROPERTIES(${EXECUTABLE} PROPERTIES DEBUGPROFILE_POSTFIX "_debug_profile")
-SET_TARGET_PROPERTIES(${EXECUTABLE} PROPERTIES RELEASEPROFILE_POSTFIX "_profile")
+SET_TARGET_PROPERTIES(${CMAKE_PROJECT_NAME} PROPERTIES DEBUGPROFILE_POSTFIX "_debug_profile")
+SET_TARGET_PROPERTIES(${CMAKE_PROJECT_NAME} PROPERTIES RELEASEPROFILE_POSTFIX "_profile")
 
 
 # Precompiled headers (2nd part)
 if (MSVC)
 	SET_TARGET_PROPERTIES(
-		${EXECUTABLE} PROPERTIES COMPILE_FLAGS "/Yu\"Globals.h\""
+		${CMAKE_PROJECT_NAME} PROPERTIES COMPILE_FLAGS "/Yu\"Globals.h\""
 		OBJECT_DEPENDS "$(IntDir)/$(TargetName.pch)"
 	)
 endif ()
 
 
 if (NOT MSVC)
-	target_link_libraries(${EXECUTABLE}
+	target_link_libraries(${CMAKE_PROJECT_NAME}
 		OSSupport HTTPServer Bindings Items Blocks Noise
-		Protocol Generating Generating_Prefabs WorldStorage
-		Mobs Entities Simulator BlockEntities UI PolarSSL++
+		Protocol Generating WorldStorage
+		Mobs Entities Simulator IncrementalRedstoneSimulator
+		BlockEntities UI mbedTLS++
 	)
 endif ()
+
 if (WIN32)
-	target_link_libraries(${EXECUTABLE} expat tolualib ws2_32.lib Psapi.lib)
+	target_link_libraries(${CMAKE_PROJECT_NAME} expat tolualib ws2_32.lib Psapi.lib)
 endif()
 
 if (${CMAKE_SYSTEM_NAME} STREQUAL "FreeBSD")
 	add_flags_lnk(-L/usr/local/lib)
+	add_flags_lnk(-L/usr/ports/devel)
 endif()
 
-target_link_libraries(${EXECUTABLE} luaexpat jsoncpp mbedtls zlib sqlite lua SQLiteCpp event_core event_extra)
+target_link_libraries(${CMAKE_PROJECT_NAME} luaexpat jsoncpp_lib_static mbedtls zlib sqlite lua SQLiteCpp event_core event_extra fmt::fmt)
+
+# Create a folder for Bindings' documentation:
+FILE(MAKE_DIRECTORY "Bindings/docs")

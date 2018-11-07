@@ -98,7 +98,7 @@ protected:
 
 
 	/** Decodes the position index along the room walls into a proper 2D position for a chest.
-	The Y coord of the returned vector specifies the chest's meta value*/
+	The Y coord of the returned vector specifies the chest's meta value. */
 	Vector3i DecodeChestCoords(int a_PosIdx, int a_SizeX, int a_SizeZ)
 	{
 		if (a_PosIdx < a_SizeX)
@@ -162,7 +162,7 @@ protected:
 		int RelStartZ = Clamp(a_StartZ - BlockZ, 0, cChunkDef::Width - 1);
 		int RelEndX   = Clamp(a_EndX - BlockX,   0, cChunkDef::Width);
 		int RelEndZ   = Clamp(a_EndZ - BlockZ,   0, cChunkDef::Width);
-		cFastRandom rnd;
+		auto & rnd = GetRandomProvider();
 		for (int y = a_StartY; y < a_EndY; y++)
 		{
 			for (int z = RelStartZ; z < RelEndZ; z++)
@@ -171,7 +171,7 @@ protected:
 				{
 					if (cBlockInfo::CanBeTerraformed(a_ChunkDesc.GetBlockType(x, y, z)))
 					{
-						BLOCKTYPE BlockType = (rnd.NextInt(101) < 75) ? a_DstBlockType1 : a_DstBlockType2;
+						BLOCKTYPE BlockType = rnd.RandBool(0.75) ? a_DstBlockType1 : a_DstBlockType2;
 						a_ChunkDesc.SetBlockType(x, y, z, BlockType);
 					}
 				}  // for x
@@ -203,6 +203,7 @@ protected:
 			{ cItem(E_ITEM_GOLDEN_APPLE),        1,         1,         1 },
 			{ cItem(E_ITEM_DIAMOND_HORSE_ARMOR), 1,         1,         1 },
 			{ cItem(E_ITEM_GOLD_HORSE_ARMOR),    1,         1,         2 },
+			{ cItem(E_ITEM_GOLD),                1,         4,         2 },
 			{ cItem(E_ITEM_13_DISC),             1,         1,         4 },
 			{ cItem(E_ITEM_CAT_DISC),            1,         1,         4 },
 			{ cItem(E_ITEM_IRON_HORSE_ARMOR),    1,         1,         5 },
@@ -211,10 +212,16 @@ protected:
 			{ cItem(E_ITEM_GUNPOWDER),           1,         4,        10 },
 			{ cItem(E_ITEM_STRING),              1,         4,        10 },
 			{ cItem(E_ITEM_REDSTONE_DUST),       1,         4,        10 },
+			{ cItem(E_ITEM_COAL),                1,         4,        10 },
+			{ cItem(E_ITEM_BONE),                1,         4,        10 },
+			{ cItem(E_ITEM_ROTTEN_FLESH),        1,         4,        10 },
 			{ cItem(E_ITEM_SADDLE),              1,         1,        10 },
 			{ cItem(E_ITEM_BUCKET),              1,         1,        10 },
 			{ cItem(E_ITEM_BREAD),               1,         1,        10 },
 			{ cItem(E_ITEM_NAME_TAG),            1,         1,        10 },
+			{ cItem(E_ITEM_BEETROOT_SEEDS),      2,         4,        10 },
+			{ cItem(E_ITEM_MELON_SEEDS),         2,         4,        10 },
+			{ cItem(E_ITEM_PUMPKIN_SEEDS),       2,         4,        10 },
 		} ;
 
 		cChestEntity * ChestEntity = static_cast<cChestEntity *>(a_ChunkDesc.GetBlockEntity(RelX, m_FloorHeight + 1, RelZ));
@@ -276,7 +283,6 @@ protected:
 
 
 
-
 ////////////////////////////////////////////////////////////////////////////////
 // cDungeonRoomsFinisher:
 
@@ -296,7 +302,6 @@ cDungeonRoomsFinisher::cDungeonRoomsFinisher(cTerrainShapeGenPtr a_ShapeGen, int
 		std::swap(m_MinHalfSize, m_MaxHalfSize);
 	}
 }
-
 
 
 

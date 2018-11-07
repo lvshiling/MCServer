@@ -27,7 +27,7 @@ public:
 	) override
 	{
 		// Handle growing the plants:
-		if (a_Item.m_ItemDamage == E_META_DYE_WHITE)
+		if ((a_Item.m_ItemDamage == E_META_DYE_WHITE) && (a_BlockFace != BLOCK_FACE_NONE))
 		{
 			if (a_World->GrowRipePlant(a_BlockX, a_BlockY, a_BlockZ, true))
 			{
@@ -63,7 +63,6 @@ public:
 			// Place the cocoa pod:
 			if (a_Player->PlaceBlock(a_BlockX, a_BlockY, a_BlockZ, E_BLOCK_COCOA_POD, BlockMeta))
 			{
-				a_World->BroadcastSoundEffect("dig.stone", a_BlockX + 0.5, a_BlockY + 0.5, a_BlockZ + 0.5, 1.0f, 0.8f);
 				if (a_Player->IsGameModeSurvival())
 				{
 					a_Player->GetInventory().RemoveOneEquippedItem();

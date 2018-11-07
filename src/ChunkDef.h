@@ -9,9 +9,6 @@
 
 #pragma once
 
-#include "Vector3.h"
-#include "BiomeDef.h"
-
 
 
 
@@ -30,22 +27,24 @@ class cBlockEntity;
 class cEntity;
 class cClientHandle;
 class cBlockEntity;
+class cChunkCoords;
 
-typedef std::list<cEntity *>        cEntityList;
-typedef std::list<cBlockEntity *>   cBlockEntityList;
+typedef std::unique_ptr<cEntity> OwnedEntity;
+typedef std::vector<OwnedEntity> cEntityList;
+typedef std::map<int, cBlockEntity *> cBlockEntities;
 
 
 
 
 // tolua_begin
 
-/// The datatype used by blockdata
+/** The datatype used by blockdata */
 typedef unsigned char BLOCKTYPE;
 
-/// The datatype used by nibbledata (meta, light, skylight)
+/** The datatype used by nibbledata (meta, light, skylight) */
 typedef unsigned char NIBBLETYPE;
 
-/// The type used by the heightmap
+/** The type used by the heightmap */
 typedef unsigned char HEIGHTTYPE;
 
 // tolua_end
@@ -53,7 +52,53 @@ typedef unsigned char HEIGHTTYPE;
 
 
 
-/// Constants used throughout the code, useful typedefs and utility functions
+
+class cChunkCoords
+{
+public:
+	int m_ChunkX;
+	int m_ChunkZ;
+
+	cChunkCoords(int a_ChunkX, int a_ChunkZ) : m_ChunkX(a_ChunkX), m_ChunkZ(a_ChunkZ) {}
+
+	bool operator == (const cChunkCoords & a_Other) const
+	{
+		return ((m_ChunkX == a_Other.m_ChunkX) && (m_ChunkZ == a_Other.m_ChunkZ));
+	}
+} ;
+
+
+
+
+
+/** Non-owning view of a chunk's client handles. */
+class cChunkClientHandles
+{
+public:
+	using const_iterator = std::vector<cClientHandle *>::const_iterator;
+	using iterator = const_iterator;
+
+	explicit cChunkClientHandles(const std::vector<cClientHandle *> & a_Container):
+		m_Begin(a_Container.cbegin()),
+		m_End(a_Container.cend())
+	{
+	}
+
+	const_iterator begin()  const { return m_Begin; }
+	const_iterator cbegin() const { return m_Begin; }
+
+	const_iterator end()  const { return m_End; }
+	const_iterator cend() const { return m_End; }
+
+private:
+	const_iterator m_Begin, m_End;
+};
+
+
+
+
+
+/** Constants used throughout the code, useful typedefs and utility functions */
 class cChunkDef
 {
 public:
@@ -61,22 +106,22 @@ public:
 	static const int Width = 16;
 	static const int Height = 256;
 	static const int NumBlocks = Width * Height * Width;
-	/// If the data is collected into a single buffer, how large it needs to be:
+
+	/** If the data is collected into a single buffer, how large it needs to be: */
 	static const int BlockDataSize = cChunkDef::NumBlocks * 2 + (cChunkDef::NumBlocks / 2);  // 2.5 * numblocks
 
-	/// The type used for any heightmap operations and storage; idx = x + Width * z; Height points to the highest non-air block in the column
+	/** The type used for any heightmap operations and storage; idx = x + Width * z; Height points to the highest non-air block in the column */
 	typedef HEIGHTTYPE HeightMap[Width * Width];
 
-	/** The type used for any biomemap operations and storage inside MCServer,
-	using MCServer biomes (need not correspond to client representation!)
-	idx = x + Width * z  // Need to verify this with the protocol spec, currently unknown!
-	*/
+	/** The type used for any biomemap operations and storage inside Cuberite,
+	using Cuberite biomes (need not correspond to client representation!)
+	idx = x + Width * z */
 	typedef EMCSBiome BiomeMap[Width * Width];
 
-	/// The type used for block type operations and storage, AXIS_ORDER ordering
+	/** The type used for block type operations and storage, AXIS_ORDER ordering */
 	typedef BLOCKTYPE BlockTypes[NumBlocks];
 
-	/// The type used for block data in nibble format, AXIS_ORDER ordering
+	/** The type used for block data in nibble format, AXIS_ORDER ordering */
 	typedef NIBBLETYPE BlockNibbles[NumBlocks / 2];
 
 	/** The storage wrapper used for compressed blockdata residing in RAMz */
@@ -86,7 +131,7 @@ public:
 	typedef std::vector<NIBBLETYPE> COMPRESSED_NIBBLETYPE;
 
 
-	/// Converts absolute block coords into relative (chunk + block) coords:
+	/** Converts absolute block coords into relative (chunk + block) coords: */
 	inline static void AbsoluteToRelative(/* in-out */ int & a_X, int & a_Y, int & a_Z, /* out */ int & a_ChunkX, int & a_ChunkZ)
 	{
 		UNUSED(a_Y);
@@ -96,20 +141,69 @@ public:
 		a_Z = a_Z - a_ChunkZ * Width;
 	}
 
+	inline static Vector3i AbsoluteToRelative(Vector3i a_BlockPosition)
+	{
+		cChunkCoords ChunckPos = BlockToChunk(a_BlockPosition);
 
-	/// Converts absolute block coords to chunk coords:
+		return {a_BlockPosition.x - ChunckPos.m_ChunkX * Width, a_BlockPosition.y, a_BlockPosition.z - ChunckPos.m_ChunkZ * Width};
+	}
+
+	inline static Vector3i AbsoluteToRelative(Vector3i a_BlockPosition, cChunkCoords a_ChunkPos)
+	{
+		return {a_BlockPosition.x - a_ChunkPos.m_ChunkX * Width, a_BlockPosition.y, a_BlockPosition.z - a_ChunkPos.m_ChunkZ * Width};
+	}
+
+	/** Converts relative block coordinates into absolute coordinates with a known chunk location */
+	inline static Vector3i RelativeToAbsolute(Vector3i a_RelBlockPosition, int a_ChunkX, int a_ChunkZ)
+	{
+		return {a_RelBlockPosition.x + a_ChunkX * Width, a_RelBlockPosition.y, a_RelBlockPosition.z + a_ChunkZ * Width};
+	}
+
+	/** Validates a height-coordinate. Returns false if height-coordiante is out of height bounds */
+	inline static bool IsValidHeight(int a_Height)
+	{
+		return ((a_Height >= 0) && (a_Height < Height));
+	}
+
+	/** Validates a width-coordinate. Returns false if width-coordiante is out of width bounds */
+	inline static bool IsValidWidth(int a_Width)
+	{
+		return ((a_Width >= 0) && (a_Width < Width));
+	}
+
+	/** Validates a chunk relative coordinate. Returns false if the coordiante is out of bounds for a chunk. */
+	inline static bool IsValidRelPos(Vector3i a_RelPos)
+	{
+		return (
+			IsValidWidth(a_RelPos.x) &&
+			IsValidHeight(a_RelPos.y) &&
+			IsValidWidth(a_RelPos.z)
+		);
+	}
+
+	/** Converts absolute block coords to chunk coords: */
 	inline static void BlockToChunk(int a_X, int a_Z, int & a_ChunkX, int & a_ChunkZ)
 	{
-		a_ChunkX = a_X / Width;
-		if ((a_X < 0) && (a_X % Width != 0))
+		// This version is deprecated in favor of the vector version
+		// If you're developing new code, use the other version.
+		auto ChunkCoords = BlockToChunk({a_X, 0, a_Z});
+		a_ChunkX = ChunkCoords.m_ChunkX;
+		a_ChunkZ = ChunkCoords.m_ChunkZ;
+	}
+
+	/** The Y coordinate of a_Pos is ignored */
+	inline static cChunkCoords BlockToChunk(Vector3i a_Pos)
+	{
+		cChunkCoords Chunk(a_Pos.x / Width, a_Pos.z / Width);
+		if ((a_Pos.x < 0) && (a_Pos.x % Width != 0))
 		{
-			a_ChunkX--;
+			Chunk.m_ChunkX--;
 		}
-		a_ChunkZ = a_Z / cChunkDef::Width;
-		if ((a_Z < 0) && (a_Z % Width != 0))
+		if ((a_Pos.z < 0) && (a_Pos.z % Width != 0))
 		{
-			a_ChunkZ--;
+			Chunk.m_ChunkZ--;
 		}
+		return Chunk;
 	}
 
 
@@ -123,7 +217,7 @@ public:
 		{
 			return MakeIndexNoCheck(x, y, z);
 		}
-		LOGERROR("cChunkDef::MakeIndex(): coords out of range: {%d, %d, %d}; returning fake index 0", x, y, z);
+		FLOGERROR("cChunkDef::MakeIndex(): coords out of range: {0}; returning fake index 0", Vector3i{x, y, z});
 		ASSERT(!"cChunkDef::MakeIndex(): coords out of chunk range!");
 		return 0;
 	}
@@ -140,19 +234,19 @@ public:
 	}
 
 
-	inline static Vector3i IndexToCoordinate( unsigned int index)
+	inline static Vector3i IndexToCoordinate(size_t index)
 	{
 		#if AXIS_ORDER == AXIS_ORDER_XZY
 			return Vector3i(  // 1.2
-				index % cChunkDef::Width,                       // X
-				index / (cChunkDef::Width * cChunkDef::Width),  // Y
-				(index / cChunkDef::Width) % cChunkDef::Width   // Z
+				static_cast<int>(index % cChunkDef::Width),                       // X
+				static_cast<int>(index / (cChunkDef::Width * cChunkDef::Width)),  // Y
+				static_cast<int>((index / cChunkDef::Width) % cChunkDef::Width)   // Z
 			);
 		#elif AXIS_ORDER == AXIS_ORDER_YZX
 			return Vector3i(  // 1.1
-				index / (cChunkDef::Height * cChunkDef::Width),  // X
-				index % cChunkDef::Height,                       // Y
-				(index / cChunkDef::Height) % cChunkDef::Width   // Z
+				static_cast<int>(index / (cChunkDef::Height * cChunkDef::Width)),  // X
+				static_cast<int>(index % cChunkDef::Height),                       // Y
+				static_cast<int>((index / cChunkDef::Height) % cChunkDef::Width)   // Z
 			);
 		#endif
 	}
@@ -326,18 +420,17 @@ private:
 
 
 /** Interface class used for comparing clients of two chunks.
-Used primarily for entity moving while both chunks are locked.
-*/
+Used primarily for entity moving while both chunks are locked. */
 class cClientDiffCallback
 {
 public:
 
 	virtual ~cClientDiffCallback() {}
 
-	/// Called for clients that are in Chunk1 and not in Chunk2,
+	/** Called for clients that are in Chunk1 and not in Chunk2, */
 	virtual void Removed(cClientHandle * a_Client) = 0;
 
-	/// Called for clients that are in Chunk2 and not in Chunk1.
+	/** Called for clients that are in Chunk2 and not in Chunk1. */
 	virtual void Added(cClientHandle * a_Client) = 0;
 } ;
 
@@ -373,31 +466,20 @@ struct sSetBlock
 
 	/** Returns the absolute Z coord of the stored block. */
 	int GetZ(void) const { return m_RelZ + cChunkDef::Width * m_ChunkZ; }
+
+	/** Returns the absolute position of the stored block. */
+	Vector3i GetPos(void) const { return Vector3i(GetX(), GetY(), GetZ()); }
 };
 
 typedef std::list<sSetBlock> sSetBlockList;
 typedef std::vector<sSetBlock> sSetBlockVector;
 
-
-
-
-
-class cChunkCoords
-{
-public:
-	int m_ChunkX;
-	int m_ChunkZ;
-
-	cChunkCoords(int a_ChunkX, int a_ChunkZ) : m_ChunkX(a_ChunkX), m_ChunkZ(a_ChunkZ) {}
-
-	bool operator == (const cChunkCoords & a_Other) const
-	{
-		return ((m_ChunkX == a_Other.m_ChunkX) && (m_ChunkZ == a_Other.m_ChunkZ));
-	}
-} ;
-
 typedef std::list<cChunkCoords> cChunkCoordsList;
 typedef std::vector<cChunkCoords> cChunkCoordsVector;
+
+
+
+
 
 /** A simple hash function for chunk coords, we assume that chunk coords won't use more than 16 bits, so the hash is almost an identity.
 Used for std::unordered_map<cChunkCoords, ...> */
@@ -442,7 +524,8 @@ public:
 
 	virtual ~cChunkCoordCallback() {}
 
-	virtual void Call(int a_ChunkX, int a_ChunkZ) = 0;
+	/** Called with the chunk's coords, and an optional operation status flag for operations that support it. */
+	virtual void Call(int a_ChunkX, int a_ChunkZ, bool a_IsSuccess) = 0;
 } ;
 
 
@@ -470,7 +553,7 @@ public:
 
 
 
-/** Generic template that can store any kind of data together with a triplet of 3 coords*/
+/** Generic template that can store any kind of data together with a triplet of 3 coords */
 template <typename X> class cCoordWithData
 {
 public:
@@ -495,32 +578,3 @@ typedef cCoordWithData<BLOCKTYPE>  cCoordWithBlock;
 
 typedef std::list<cCoordWithInt>   cCoordWithIntList;
 typedef std::vector<cCoordWithInt> cCoordWithIntVector;
-
-
-
-
-
-/** Generic template that can store two types of any kind of data together with a triplet of 3 coords */
-template <typename X, typename Z> class cCoordWithDoubleData
-{
-public:
-	int x;
-	int y;
-	int z;
-	X   Data;
-	Z   DataTwo;
-
-	cCoordWithDoubleData(int a_X, int a_Y, int a_Z) :
-		x(a_X), y(a_Y), z(a_Z)
-	{
-	}
-
-	cCoordWithDoubleData(int a_X, int a_Y, int a_Z, const X & a_Data, const Z & a_DataTwo) :
-		x(a_X), y(a_Y), z(a_Z), Data(a_Data), DataTwo(a_DataTwo)
-	{
-	}
-};
-
-typedef cCoordWithDoubleData <BLOCKTYPE, bool> cCoordWithBlockAndBool;
-
-typedef std::vector<cCoordWithBlockAndBool> cCoordWithBlockAndBoolVector;

@@ -1,9 +1,7 @@
-
-cmake_minimum_required (VERSION 2.6)
-
+cmake_minimum_required(VERSION 3.0.2)
 project (MCADefrag)
 
-# Without this, the MSVC variable isn't defined for MSVC builds ( http://www.cmake.org/pipermail/cmake/2011-November/047130.html )
+# Without this, the MSVC variable isn't defined for MSVC builds ( https://www.cmake.org/pipermail/cmake/2011-November/047130.html )
 enable_language(CXX C)
 
 include(../../SetFlags.cmake)
@@ -11,16 +9,8 @@ set_flags()
 set_lib_flags()
 enable_profile()
 
-if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang")
-	add_flags_cxx("-Wno-error=sign-conversion -Wno-error=conversion -Wno-error=shorten-64-to-32")
-	add_flags_cxx("-Wno-error=old-style-cast")
-	if ("${CLANG_VERSION}" VERSION_GREATER 3.5)
-		add_flags_cxx("-Wno-error=keyword-macro")
-	endif()
-endif()
-
 # Set include paths to the used libraries:
-include_directories("../../lib")
+include_directories(SYSTEM "../../lib")
 include_directories("../../src")
 
 
@@ -62,6 +52,7 @@ set(SHARED_OSS_SRC
 	../../src/OSSupport/File.cpp
 	../../src/OSSupport/IsThread.cpp
 	../../src/OSSupport/StackTrace.cpp
+	../../src/OSSupport/WinStackWalker.cpp
 )
 
 set(SHARED_OSS_HDR
@@ -70,12 +61,9 @@ set(SHARED_OSS_HDR
 	../../src/OSSupport/File.h
 	../../src/OSSupport/IsThread.h
 	../../src/OSSupport/StackTrace.h
+	../../src/OSSupport/WinStackWalker.h
 )
 
-if(WIN32)
-	list (APPEND SHARED_OSS_SRC ../../src/StackWalker.cpp)
-	list (APPEND SHARED_OSS_HDR ../../src/StackWalker.h)
-endif()
 
 flatten_files(SHARED_OSS_SRC)
 flatten_files(SHARED_OSS_HDR)
@@ -105,5 +93,4 @@ add_executable(MCADefrag
 	${SHARED_OSS_HDR}
 )
 
-target_link_libraries(MCADefrag zlib)
-
+target_link_libraries(MCADefrag zlib fmt::fmt)

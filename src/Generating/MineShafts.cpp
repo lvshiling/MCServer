@@ -64,21 +64,20 @@ public:
 		m_BoundingBox(a_BoundingBox)
 	{
 	}
-	
+
 	virtual ~cMineShaft() {}
 
-	/// Returns true if this mineshaft intersects the specified cuboid
+	/** Returns true if this mineshaft intersects the specified cuboid */
 	bool DoesIntersect(const cCuboid & a_Other)
 	{
 		return m_BoundingBox.DoesIntersect(a_Other);
 	}
 
 	/** If recursion level is not too large, appends more branches to the parent system,
-	using exit points specific to this class.
-	*/
+	using exit points specific to this class. */
 	virtual void AppendBranches(int a_RecursionLevel, cNoise & a_Noise) = 0;
 
-	/// Imprints this shape into the specified chunk's data
+	/** Imprints this shape into the specified chunk's data */
 	virtual void ProcessChunk(cChunkDesc & a_ChunkDesc) = 0;
 } ;
 
@@ -141,16 +140,16 @@ protected:
 	virtual void AppendBranches(int a_RecursionLevel, cNoise & a_Noise) override;
 	virtual void ProcessChunk(cChunkDesc & a_ChunkDesc) override;
 
-	/// Places a chest, if the corridor has one
+	/** Places a chest, if the corridor has one */
 	void PlaceChest(cChunkDesc & a_ChunkDesc);
 
-	/// If this corridor has tracks, places them randomly
+	/** If this corridor has tracks, places them randomly */
 	void PlaceTracks(cChunkDesc & a_ChunkDesc);
 
-	/// If this corridor has a spawner, places the spawner
+	/** If this corridor has a spawner, places the spawner */
 	void PlaceSpawner(cChunkDesc & a_ChunkDesc);
 
-	/// Randomly places torches around the central beam block
+	/** Randomly places torches around the central beam block */
 	void PlaceTorches(cChunkDesc & a_ChunkDesc);
 } ;
 
@@ -768,26 +767,30 @@ void cMineShaftCorridor::PlaceChest(cChunkDesc & a_ChunkDesc)
 	int BlockZ = a_ChunkDesc.GetChunkZ() * cChunkDef::Width;
 	int x, z;
 	NIBBLETYPE Meta = 0;
-	switch (m_Direction)
+	[&]
 	{
-		case dirXM:
-		case dirXP:
+		switch (m_Direction)
 		{
-			x = m_BoundingBox.p1.x + m_ChestPosition - BlockX;
-			z = m_BoundingBox.p1.z - BlockZ;
-			Meta = E_META_CHEST_FACING_ZP;
-			break;
-		}
+			case dirXM:
+			case dirXP:
+			{
+				x = m_BoundingBox.p1.x + m_ChestPosition - BlockX;
+				z = m_BoundingBox.p1.z - BlockZ;
+				Meta = E_META_CHEST_FACING_ZP;
+				return;
+			}
 
-		case dirZM:
-		case dirZP:
-		{
-			x = m_BoundingBox.p1.x - BlockX;
-			z = m_BoundingBox.p1.z + m_ChestPosition - BlockZ;
-			Meta = E_META_CHEST_FACING_XP;
-			break;
-		}
-	}  // switch (Dir)
+			case dirZM:
+			case dirZP:
+			{
+				x = m_BoundingBox.p1.x - BlockX;
+				z = m_BoundingBox.p1.z + m_ChestPosition - BlockZ;
+				Meta = E_META_CHEST_FACING_XP;
+				return;
+			}
+		}  // switch (Dir)
+		UNREACHABLE("Unsupported corridor direction");
+	}();
 
 	if (
 		(x >= 0) && (x < cChunkDef::Width) &&
@@ -1287,7 +1290,6 @@ cStructGenMineShafts::cStructGenMineShafts(
 	int a_ChanceCorridor, int a_ChanceCrossing, int a_ChanceStaircase
 ) :
 	super(a_Seed, a_GridSize, a_GridSize, a_MaxOffset, a_MaxOffset, a_MaxSystemSize, a_MaxSystemSize, 100),
-	m_Noise(a_Seed),
 	m_GridSize(a_GridSize),
 	m_MaxSystemSize(a_MaxSystemSize),
 	m_ProbLevelCorridor(std::max(0, a_ChanceCorridor)),

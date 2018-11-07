@@ -16,16 +16,15 @@ public:
 	{
 	}
 
-
 	virtual bool GetPlacementBlockTypeMeta(
-		cChunkInterface & a_ChunkInterface, cPlayer * a_Player,
+		cChunkInterface & a_ChunkInterface, cPlayer & a_Player,
 		int a_BlockX, int a_BlockY, int a_BlockZ, eBlockFace a_BlockFace,
 		int a_CursorX, int a_CursorY, int a_CursorZ,
 		BLOCKTYPE & a_BlockType, NIBBLETYPE & a_BlockMeta
 	) override
 	{
 		a_BlockType = m_BlockType;
-		
+
 		// Convert the blockface into meta:
 		switch (a_BlockFace)
 		{
@@ -40,7 +39,6 @@ public:
 		return true;
 	}
 
-
 	virtual NIBBLETYPE MetaMirrorXZ(NIBBLETYPE a_Meta) override
 	{
 		// Bit 0x08 is a flag.  Lowest three bits are position.  0x08 == 1000
@@ -53,6 +51,18 @@ public:
 		}
 		// Not Facing Up or Down; No change.
 		return a_Meta;
+	}
+
+	virtual void ConvertToPickups(cItems & a_Pickups, NIBBLETYPE a_BlockMeta) override
+	{
+		// Reset meta to 0
+		a_Pickups.push_back(cItem(m_BlockType, 1, 0));
+	}
+
+	virtual ColourID GetMapBaseColourID(NIBBLETYPE a_Meta) override
+	{
+		UNUSED(a_Meta);
+		return 11;
 	}
 } ;
 

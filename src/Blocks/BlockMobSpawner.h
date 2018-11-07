@@ -2,7 +2,6 @@
 #pragma once
 
 #include "BlockHandler.h"
-#include "../World.h"
 #include "../Items/ItemHandler.h"
 
 
@@ -19,9 +18,9 @@ public:
 	}
 
 
-	virtual void OnUse(cChunkInterface & a_ChunkInterface, cWorldInterface & a_WorldInterface, cPlayer *a_Player, int a_BlockX, int a_BlockY, int a_BlockZ, eBlockFace a_BlockFace, int a_CursorX, int a_CursorY, int a_CursorZ) override
+	virtual bool OnUse(cChunkInterface & a_ChunkInterface, cWorldInterface & a_WorldInterface, cPlayer & a_Player, int a_BlockX, int a_BlockY, int a_BlockZ, eBlockFace a_BlockFace, int a_CursorX, int a_CursorY, int a_CursorZ) override
 	{
-		a_ChunkInterface.UseBlockEntity(a_Player, a_BlockX, a_BlockY, a_BlockZ);
+		return a_ChunkInterface.UseBlockEntity(&a_Player, a_BlockX, a_BlockY, a_BlockZ);
 	}
 
 
@@ -35,18 +34,18 @@ public:
 	{
 		// No pickups
 	}
-	
-	
-	virtual void OnDestroyedByPlayer(cChunkInterface & a_ChunkInterface, cWorldInterface & a_WorldInterface, cPlayer * a_Player, int a_BlockX, int a_BlockY, int a_BlockZ) override
+
+
+	virtual void OnDestroyedByPlayer(cChunkInterface & a_ChunkInterface, cWorldInterface & a_WorldInterface, cPlayer & a_Player, int a_BlockX, int a_BlockY, int a_BlockZ) override
 	{
-		cItemHandler * Handler = a_Player->GetEquippedItem().GetHandler();
-		if (a_Player->IsGameModeCreative() || !Handler->CanHarvestBlock(E_BLOCK_MOB_SPAWNER))
+		cItemHandler * Handler = a_Player.GetEquippedItem().GetHandler();
+		if (a_Player.IsGameModeCreative() || !Handler->CanHarvestBlock(E_BLOCK_MOB_SPAWNER))
 		{
 			return;
 		}
 
-		cFastRandom Random;
-		int Reward = 15 + Random.NextInt(15) + Random.NextInt(15);
-		a_WorldInterface.SpawnExperienceOrb((double)a_BlockX, (double)a_BlockY + 1, (double)a_BlockZ, Reward);
+		auto & Random = GetRandomProvider();
+		int Reward = 15 + Random.RandInt(14) + Random.RandInt(14);
+		a_WorldInterface.SpawnSplitExperienceOrbs(static_cast<double>(a_BlockX), static_cast<double>(a_BlockY + 1), static_cast<double>(a_BlockZ), Reward);
 	}
 } ;

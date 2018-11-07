@@ -6,7 +6,6 @@
 #include "../Simulator/FluidSimulator.h"
 #include "../Blocks/BlockHandler.h"
 #include "../LineBlockTracer.h"
-#include "../BlockInServerPluginInterface.h"
 #include "../Blocks/ChunkInterface.h"
 
 
@@ -42,9 +41,9 @@ public:
 			}
 		}
 	}
-	
-	
-	
+
+
+
 	bool ScoopUpFluid(cWorld * a_World, cPlayer * a_Player, const cItem & a_Item, int a_BlockX, int a_BlockY, int a_BlockZ, eBlockFace a_BlockFace)
 	{
 		if (a_BlockFace != BLOCK_FACE_NONE)
@@ -79,7 +78,7 @@ public:
 		{
 			return false;
 		}
-		
+
 		// Check to see if destination block is too far away
 		// Reach Distance Multiplayer = 5 Blocks
 		if ((BlockPos.x - a_Player->GetPosX() > 5) || (BlockPos.z - a_Player->GetPosZ() > 5))
@@ -124,7 +123,7 @@ public:
 		{
 			return false;
 		}
-		
+
 		BLOCKTYPE CurrentBlockType;
 		NIBBLETYPE CurrentBlockMeta;
 		eBlockFace EntryFace;
@@ -140,8 +139,8 @@ public:
 		{
 			return false;
 		}
-		
-		if (a_Player->GetGameMode() != gmCreative)
+
+		if (!a_Player->IsGameModeCreative())
 		{
 			// Remove fluid bucket, add empty bucket:
 			if (!a_Player->GetInventory().RemoveOneEquippedItem())
@@ -156,7 +155,7 @@ public:
 				return false;
 			}
 		}
-		
+
 		// Wash away anything that was there prior to placing:
 		if (cFluidSimulator::CanWashAway(CurrentBlockType))
 		{
@@ -189,14 +188,14 @@ public:
 		public:
 			Vector3i m_Pos;
 			bool     m_HasHitFluid;
-			
+
 
 			cCallbacks(void) :
 				m_HasHitFluid(false)
 			{
 			}
-			
-			virtual bool OnNextBlock(int a_BlockX, int a_BlockY, int a_BlockZ, BLOCKTYPE a_BlockType, NIBBLETYPE a_BlockMeta, char a_EntryFace) override
+
+			virtual bool OnNextBlock(int a_BlockX, int a_BlockY, int a_BlockZ, BLOCKTYPE a_BlockType, NIBBLETYPE a_BlockMeta, eBlockFace a_EntryFace) override
 			{
 				if (IsBlockWater(a_BlockType) || IsBlockLava(a_BlockType))
 				{
@@ -227,8 +226,8 @@ public:
 		a_BlockPos = Callbacks.m_Pos;
 		return true;
 	}
-	
-	
+
+
 
 	bool GetPlacementCoordsFromTrace(cWorld * a_World, cPlayer * a_Player, Vector3i & a_BlockPos, BLOCKTYPE & a_BlockType, NIBBLETYPE & a_BlockMeta, eBlockFace & a_BlockFace)
 	{
@@ -240,8 +239,8 @@ public:
 			BLOCKTYPE  m_ReplacedBlockType;
 			NIBBLETYPE m_ReplacedBlockMeta;
 			eBlockFace m_EntryFace;
-			
-			virtual bool OnNextBlock(int a_CBBlockX, int a_CBBlockY, int a_CBBlockZ, BLOCKTYPE a_CBBlockType, NIBBLETYPE a_CBBlockMeta, char a_CBEntryFace) override
+
+			virtual bool OnNextBlock(int a_CBBlockX, int a_CBBlockY, int a_CBBlockZ, BLOCKTYPE a_CBBlockType, NIBBLETYPE a_CBBlockMeta, eBlockFace a_CBEntryFace) override
 			{
 				if (a_CBBlockType != E_BLOCK_AIR)
 				{
@@ -250,7 +249,7 @@ public:
 					m_EntryFace = static_cast<eBlockFace>(a_CBEntryFace);
 					if (!cFluidSimulator::CanWashAway(a_CBBlockType) && !IsBlockLiquid(a_CBBlockType))
 					{
-						AddFaceDirection(a_CBBlockX, a_CBBlockY, a_CBBlockZ, static_cast<eBlockFace>(a_CBEntryFace));  // Was an unwashawayable block, can't overwrite it!
+						AddFaceDirection(a_CBBlockX, a_CBBlockY, a_CBBlockZ, a_CBEntryFace);  // Was an unwashawayable block, can't overwrite it!
 					}
 					m_Pos.Set(a_CBBlockX, a_CBBlockY, a_CBBlockZ);  // (Block could be washed away, replace it)
 					return true;  // Abort tracing
@@ -263,7 +262,8 @@ public:
 		Vector3d Start(a_Player->GetEyePosition());
 		Vector3d End(a_Player->GetEyePosition() + a_Player->GetLookVector() * 5);
 
-		// cTracer::Trace returns true when whole line was traversed. By returning true from the callback when we hit something, we ensure that this never happens if liquid could be placed
+		// cLineBlockTracer::Trace() returns true when whole line was traversed. By returning true from the callback when we hit something,
+		// we ensure that this never happens if liquid could be placed
 		// Use this to judge whether the position is valid
 		if (!Tracer.Trace(Start.x, Start.y, Start.z, End.x, End.y, End.z))
 		{

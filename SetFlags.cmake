@@ -16,14 +16,8 @@ macro (add_flags_lnk FLAGS)
 endmacro()
 
 macro(add_flags_cxx FLAGS)
-	#set(CMAKE_CXX_FLAGS          "${CMAKE_CXX_FLAGS}          ${FLAGS}")
-	#set(CMAKE_C_FLAGS            "${CMAKE_C_FLAGS}            ${FLAGS}")
-	set(CMAKE_CXX_FLAGS_DEBUG    "${CMAKE_CXX_FLAGS_DEBUG}    ${FLAGS}")
-	set(CMAKE_C_FLAGS_DEBUG      "${CMAKE_C_FLAGS_DEBUG}      ${FLAGS}")
-	set(CMAKE_CXX_FLAGS_COVERAGE "${CMAKE_CXX_FLAGS_COVERAGE} ${FLAGS}")
-	set(CMAKE_C_FLAGS_COVERAGE   "${CMAKE_C_FLAGS_COVERAGE}   ${FLAGS}")
-	set(CMAKE_CXX_FLAGS_RELEASE  "${CMAKE_CXX_FLAGS_RELEASE}  ${FLAGS}")
-	set(CMAKE_C_FLAGS_RELEASE    "${CMAKE_C_FLAGS_RELEASE}    ${FLAGS}")
+	set(CMAKE_CXX_FLAGS          "${CMAKE_CXX_FLAGS} ${FLAGS}")
+	set(CMAKE_C_FLAGS            "${CMAKE_C_FLAGS}   ${FLAGS}")
 endmacro()
 
 
@@ -32,7 +26,7 @@ macro(get_clang_version)
 	execute_process(
 		COMMAND "${CMAKE_CXX_COMPILER}" "--version"
 		OUTPUT_VARIABLE CLANG_VERSION_OUTPUT)
-	string(REGEX MATCH "version ([0-9]\\.[0-9])" x ${CLANG_VERSION_OUTPUT})
+	string(REGEX MATCH "version ([0-9]+\\.[0-9]+)" x ${CLANG_VERSION_OUTPUT})
 	set(CLANG_VERSION ${CMAKE_MATCH_1})
 endmacro()
 
@@ -68,12 +62,17 @@ macro(set_flags)
 		set(CMAKE_EXE_LINKER_FLAGS_RELEASE    "${CMAKE_EXE_LINKER_FLAGS_RELEASE}    /LTCG")
 		set(CMAKE_SHARED_LINKER_FLAGS_RELEASE "${CMAKE_SHARED_LINKER_FLAGS_RELEASE} /LTCG")
 		set(CMAKE_MODULE_LINKER_FLAGS_RELEASE "${CMAKE_MODULE_LINKER_FLAGS_RELEASE} /LTCG")
+
+		# Make build use Unicode:
+		add_definitions(-DUNICODE -D_UNICODE)
 	elseif(APPLE)
-	
+
 		if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
-			execute_process(COMMAND ${CMAKE_C_COMPILER} -dumpversion
-                		OUTPUT_VARIABLE GCC_VERSION)
-                endif()
+			execute_process(
+				COMMAND ${CMAKE_C_COMPILER} -dumpversion
+				OUTPUT_VARIABLE GCC_VERSION
+			)
+		endif()
 
 		set(CMAKE_CXX_FLAGS          "${CMAKE_CXX_FLAGS}          -std=c++11")
 		set(CMAKE_CXX_FLAGS_DEBUG    "${CMAKE_CXX_FLAGS_DEBUG}    -std=c++11")
@@ -87,7 +86,13 @@ macro(set_flags)
 		else()
 			add_flags_cxx("-pthread")
 		endif()
+	elseif (ANDROID)
+		set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
+		set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -std=c++11")
+		set(CMAKE_CXX_FLAGS_COVERAGE "${CMAKE_CXX_FLAGS_COVERAGE} -std=c++11")
+		set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -std=c++11")
 
+		add_flags_cxx("-fsigned-char")
 	else()
 		# Let gcc / clang know that we're compiling a multi-threaded app:
 		if (${UNIX})
@@ -96,9 +101,11 @@ macro(set_flags)
 		endif()
 
 		if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
-			execute_process(COMMAND ${CMAKE_C_COMPILER} -dumpversion
-                		OUTPUT_VARIABLE GCC_VERSION)
-                endif()
+			execute_process(
+				COMMAND ${CMAKE_C_COMPILER} -dumpversion
+				OUTPUT_VARIABLE GCC_VERSION
+			)
+		endif()
 
 		set(CMAKE_CXX_FLAGS          "${CMAKE_CXX_FLAGS}          -std=c++11")
 		set(CMAKE_CXX_FLAGS_DEBUG    "${CMAKE_CXX_FLAGS_DEBUG}    -std=c++11")
@@ -119,13 +126,17 @@ macro(set_flags)
 
 
 	# Have the compiler generate code specifically targeted at the current machine on Linux
-	if(LINUX AND NOT CROSSCOMPILE)
+	if(LINUX AND NOT NO_NATIVE_OPTIMIZATION)
 		add_flags_cxx("-march=native")
 	endif()
 
+	if(CROSSCOMPILE)
+		message(FATAL_ERROR "The CROSSCOMPILE flag has been renamed to NO_NATIVE_OPTIMIZATION. Please update your build scripts to compile Cuberite.")
+	endif()
+
 	if ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang")
-        get_clang_version()
-    endif()
+		get_clang_version()
+	endif()
 
 
 	# Use static CRT in MSVC builds:
@@ -241,7 +252,7 @@ macro(set_exe_flags)
 		string(REPLACE "-w" "" CMAKE_C_FLAGS_DEBUG      "${CMAKE_C_FLAGS_DEBUG}")
 		string(REPLACE "-w" "" CMAKE_CXX_FLAGS_COVERAGE "${CMAKE_CXX_FLAGS_COVERAGE}")
 		string(REPLACE "-w" "" CMAKE_C_FLAGS_COVERAGE   "${CMAKE_C_FLAGS_COVERAGE}")
-		add_flags_cxx("-Wall -Wextra -Wno-unused-parameter")
+		add_flags_cxx("-Wall -Wextra -Wno-unused-parameter -Wno-missing-noreturn")
 
 		# we support non-IEEE 754 fpus so can make no guarentees about error
 		add_flags_cxx("-ffast-math")
@@ -253,12 +264,13 @@ macro(set_exe_flags)
 
 		if ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang")
 			if ("${CLANG_VERSION}" VERSION_LESS 3.0)
-				message(FATAL_ERROR "MCServer requires clang version 3.0 or higher, version is ${CLANG_VERSION}")
+				message(FATAL_ERROR "Cuberite requires clang version 3.0 or higher, your version is ${CLANG_VERSION}")
 			endif()
 			# clang does not provide the __extern_always_inline macro and a part of libm depends on this when using fast-math
 			add_flags_cxx("-D__extern_always_inline=inline")
 			add_flags_cxx("-Weverything -Werror -Wno-c++98-compat-pedantic -Wno-string-conversion")
 			add_flags_cxx("-Wno-exit-time-destructors -Wno-padded -Wno-weak-vtables")
+			add_flags_cxx("-Wno-switch-enum")  # This is a pretty useless warning, we've already got -Wswitch which is what we need
 			if ("${CLANG_VERSION}" VERSION_GREATER 3.0)
 				# flags that are not present in 3.0
 				add_flags_cxx("-Wno-implicit-fallthrough")
@@ -268,9 +280,29 @@ macro(set_exe_flags)
 				add_flags_cxx("-Wno-documentation")
 			endif()
 			if ("${CLANG_VERSION}" VERSION_GREATER 3.5)
-				# Use this flag to ignore error for a reserved macro problem in sqlite 3
-				add_flags_cxx("-Wno-reserved-id-macro")
+				include(CheckCXXCompilerFlag)
+				check_cxx_compiler_flag(-Wno-reserved-id-macro HAS_NO_RESERVED_ID_MACRO)
+				check_cxx_compiler_flag(-Wno-documentation-unknown-command HAS_NO_DOCUMENTATION_UNKNOWN)
+				if (HAS_NO_RESERVED_ID_MACRO)
+					# Use this flag to ignore error for a reserved macro problem in sqlite 3
+					add_flags_cxx("-Wno-reserved-id-macro")
+				endif()
+				if (HAS_NO_DOCUMENTATION_UNKNOWN)
+					# Ignore another problem in sqlite
+					add_flags_cxx("-Wno-documentation-unknown-command")
+				endif()
 			endif()
+			if ("${CLANG_VERSION}" VERSION_GREATER 3.5)
+				add_flags_cxx("-Wno-error=disabled-macro-expansion")
+			endif()
+			if ("${CLANG_VERSION}" VERSION_GREATER 3.7)
+				check_cxx_compiler_flag(-Wno-double-promotion HAS_NO_DOUBLE_PROMOTION)
+				if (HAS_NO_DOUBLE_PROMOTION)
+					add_flags_cxx("-Wno-double-promotion")
+				endif()
+			endif()
+			add_flags_cxx("-Wno-error=unused-command-line-argument")
+			add_flags_cxx("-Wno-documentation-unknown-command")
 		endif()
 	endif()
 
@@ -283,7 +315,7 @@ endmacro()
 #			set_source_files_properties(${FILENAME} PROPERTIES COMPILE_FLAGS "-Wno-error=missing-prototypes -Wno-error=deprecated")
 #			set_source_files_properties(${FILENAME} PROPERTIES COMPILE_FLAGS "-Wno-error=shadow -Wno-error=old-style-cast  -Wno-error=switch-enum -Wno-error=switch")
 #			set_source_files_properties(${FILENAME} PROPERTIES COMPILE_FLAGS "-Wno-error=float-equal -Wno-error=global-constructors")
-			
+
 #			if ("${CLANG_VERSION}" VERSION_GREATER 3.0)
 #				# flags that are not present in 3.0
 #				set_source_files_properties(${FILENAME} PROPERTIES COMPILE_FLAGS "-Wno-error=covered-switch-default ")
@@ -292,4 +324,3 @@ endmacro()
 #			endif()
 #		endforeach()
 #	endif()
-

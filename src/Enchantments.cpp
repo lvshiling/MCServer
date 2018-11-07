@@ -45,7 +45,7 @@ void cEnchantments::Add(const cEnchantments & a_Other)
 void cEnchantments::AddFromString(const AString & a_StringSpec)
 {
 	// Add enchantments in the stringspec; if a specified enchantment already exists, overwrites it
-	
+
 	// Split the StringSpec into separate declarations, each in the form "id=lvl":
 	AStringVector Decls = StringSplit(a_StringSpec, ";");
 	for (AStringVector::const_iterator itr = Decls.begin(), end = Decls.end(); itr != end; ++itr)
@@ -148,7 +148,6 @@ void cEnchantments::SetLevel(int a_EnchantmentID, unsigned int a_Level)
 
 
 
-
 void cEnchantments::Clear(void)
 {
 	m_Enchantments.clear();
@@ -167,6 +166,164 @@ bool cEnchantments::IsEmpty(void) const
 
 
 
+unsigned int cEnchantments::GetLevelCap(int a_EnchantmentID)
+{
+	switch (a_EnchantmentID)
+	{
+		case enchProtection:           return 4;
+		case enchFireProtection:       return 4;
+		case enchFeatherFalling:       return 4;
+		case enchBlastProtection:      return 4;
+		case enchProjectileProtection: return 4;
+		case enchRespiration:          return 3;
+		case enchAquaAffinity:         return 1;
+		case enchThorns:               return 3;
+		case enchDepthStrider:         return 3;
+		case enchSharpness:            return 5;
+		case enchSmite:                return 5;
+		case enchBaneOfArthropods:     return 5;
+		case enchKnockback:            return 2;
+		case enchFireAspect:           return 2;
+		case enchLooting:              return 3;
+		case enchEfficiency:           return 5;
+		case enchSilkTouch:            return 1;
+		case enchUnbreaking:           return 3;
+		case enchFortune:              return 3;
+		case enchPower:                return 5;
+		case enchPunch:                return 2;
+		case enchFlame:                return 1;
+		case enchInfinity:             return 1;
+		case enchLuckOfTheSea:         return 3;
+		case enchLure:                 return 3;
+	}
+	LOGWARNING("Unknown enchantment ID %d", a_EnchantmentID);
+	return 0;
+}
+
+
+
+
+
+int cEnchantments::GetXPCostMultiplier(int a_EnchantmentID, bool FromBook)
+{
+	if (FromBook)
+	{
+		switch (a_EnchantmentID)
+		{
+			case enchProtection:           return 1;
+			case enchFireProtection:       return 1;
+			case enchFeatherFalling:       return 1;
+			case enchBlastProtection:      return 2;
+			case enchProjectileProtection: return 1;
+			case enchRespiration:          return 2;
+			case enchAquaAffinity:         return 2;
+			case enchThorns:               return 4;
+			case enchDepthStrider:         return 2;
+			case enchSharpness:            return 1;
+			case enchSmite:                return 1;
+			case enchBaneOfArthropods:     return 1;
+			case enchKnockback:            return 1;
+			case enchFireAspect:           return 2;
+			case enchLooting:              return 2;
+			case enchEfficiency:           return 1;
+			case enchSilkTouch:            return 4;
+			case enchUnbreaking:           return 1;
+			case enchFortune:              return 1;
+			case enchPower:                return 1;
+			case enchPunch:                return 2;
+			case enchFlame:                return 2;
+			case enchInfinity:             return 4;
+			case enchLuckOfTheSea:         return 2;
+			case enchLure:                 return 2;
+		}
+	}
+	else  // Without book
+	{
+		switch (a_EnchantmentID)
+		{
+			case enchProtection:           return 1;
+			case enchFireProtection:       return 2;
+			case enchFeatherFalling:       return 2;
+			case enchBlastProtection:      return 4;
+			case enchProjectileProtection: return 2;
+			case enchRespiration:          return 4;
+			case enchAquaAffinity:         return 4;
+			case enchThorns:               return 8;
+			case enchDepthStrider:         return 4;
+
+			case enchSharpness:            return 1;
+			case enchSmite:                return 2;
+			case enchBaneOfArthropods:     return 2;
+			case enchKnockback:            return 2;
+			case enchFireAspect:           return 4;
+			case enchLooting:              return 4;
+
+			case enchEfficiency:           return 1;
+			case enchSilkTouch:            return 8;
+			case enchUnbreaking:           return 2;
+			case enchFortune:              return 4;
+			case enchPower:                return 1;
+			case enchPunch:                return 4;
+			case enchFlame:                return 4;
+			case enchInfinity:             return 8;
+			case enchLuckOfTheSea:         return 4;
+			case enchLure:                 return 4;
+		}
+	}
+	LOGWARNING("Unknown enchantment ID %d", a_EnchantmentID);
+	return 0;
+}
+
+
+
+
+
+bool cEnchantments::CanAddEnchantment(int a_EnchantmentID) const
+{
+	if (GetLevel(a_EnchantmentID) > 0)
+	{
+		return true;
+	}
+
+	static const std::vector<std::set<int> > IncompatibleEnchantments =
+	{
+		// Armor
+		{ enchProtection, enchFireProtection, enchBlastProtection, enchProjectileProtection },
+
+		// Tool
+		{ enchFortune, enchSilkTouch },
+
+		// Sword
+		{ enchSharpness, enchSmite, enchBaneOfArthropods },
+
+		// Boots
+		// {enchDepthStrider, enchFrostWalker},
+
+		// Bow
+		// {enchInfinity, enchMending}
+	};
+
+	for (auto excl: IncompatibleEnchantments)
+	{
+		if (excl.count(a_EnchantmentID) != 0)
+		{
+			// See if we also have any of the enchantments
+			for (auto ench: excl)
+			{
+				if (GetLevel(ench) > 0)
+				{
+					return false;
+				}
+			}
+		}
+	}
+	return true;
+}
+
+
+
+
+
 int cEnchantments::StringToEnchantmentID(const AString & a_EnchantmentName)
 {
 	static const struct
@@ -175,31 +332,31 @@ int cEnchantments::StringToEnchantmentID(const AString & a_EnchantmentName)
 		const char * m_Name;
 	} EnchantmentNames[] =
 	{
-		{ enchProtection,           "Protection"},
-		{ enchFireProtection,       "FireProtection"},
-		{ enchFeatherFalling,       "FeatherFalling"},
-		{ enchBlastProtection,      "BlastProtection"},
-		{ enchProjectileProtection, "ProjectileProtection"},
-		{ enchRespiration,          "Respiration"},
-		{ enchAquaAffinity,         "AquaAffinity"},
-		{ enchThorns,               "Thorns"},
-		{ enchDepthStrider,         "DepthStrider"},
-		{ enchSharpness,            "Sharpness"},
-		{ enchSmite,                "Smite"},
-		{ enchBaneOfArthropods,     "BaneOfArthropods"},
-		{ enchKnockback,            "Knockback"},
-		{ enchFireAspect,           "FireAspect"},
-		{ enchLooting,              "Looting"},
-		{ enchEfficiency,           "Efficiency"},
-		{ enchSilkTouch,            "SilkTouch"},
-		{ enchUnbreaking,           "Unbreaking"},
-		{ enchFortune,              "Fortune"},
-		{ enchPower,                "Power"},
-		{ enchPunch,                "Punch"},
-		{ enchFlame,                "Flame"},
-		{ enchInfinity,             "Infinity"},
-		{ enchLuckOfTheSea,         "LuckOfTheSea"},
-		{ enchLure,                 "Lure"},
+		{ enchProtection,           "Protection" },
+		{ enchFireProtection,       "FireProtection" },
+		{ enchFeatherFalling,       "FeatherFalling" },
+		{ enchBlastProtection,      "BlastProtection" },
+		{ enchProjectileProtection, "ProjectileProtection" },
+		{ enchRespiration,          "Respiration" },
+		{ enchAquaAffinity,         "AquaAffinity" },
+		{ enchThorns,               "Thorns" },
+		{ enchDepthStrider,         "DepthStrider" },
+		{ enchSharpness,            "Sharpness" },
+		{ enchSmite,                "Smite" },
+		{ enchBaneOfArthropods,     "BaneOfArthropods" },
+		{ enchKnockback,            "Knockback" },
+		{ enchFireAspect,           "FireAspect" },
+		{ enchLooting,              "Looting" },
+		{ enchEfficiency,           "Efficiency" },
+		{ enchSilkTouch,            "SilkTouch" },
+		{ enchUnbreaking,           "Unbreaking" },
+		{ enchFortune,              "Fortune" },
+		{ enchPower,                "Power" },
+		{ enchPunch,                "Punch" },
+		{ enchFlame,                "Flame" },
+		{ enchInfinity,             "Infinity" },
+		{ enchLuckOfTheSea,         "LuckOfTheSea" },
+		{ enchLure,                 "Lure" },
 	} ;
 
 	// First try to parse as a number:
@@ -507,7 +664,7 @@ void cEnchantments::AddItemEnchantmentWeights(cWeightedEnchantments & a_Enchantm
 			{
 				AddEnchantmentWeightToVector(a_Enchantments, 5, enchFeatherFalling, 1);
 			}
-			
+
 			// Depth Strider
 			if ((a_EnchantmentLevel >= 30) && (a_EnchantmentLevel <= 45))
 			{
@@ -1012,14 +1169,12 @@ void cEnchantments::CheckEnchantmentConflictsFromVector(cWeightedEnchantments & 
 
 cEnchantments cEnchantments::GetRandomEnchantmentFromVector(cWeightedEnchantments & a_Enchantments)
 {
-	cFastRandom Random;
-
 	int AllWeights = 0;
 	for (cWeightedEnchantments::iterator it = a_Enchantments.begin(); it != a_Enchantments.end(); ++it)
 	{
 		AllWeights += (*it).m_Weight;
 	}
-	int RandomNumber = Random.GenerateRandomInteger(0, AllWeights - 1);
+	int RandomNumber = GetRandomProvider().RandInt(AllWeights - 1);
 	for (cWeightedEnchantments::iterator it = a_Enchantments.begin(); it != a_Enchantments.end(); ++it)
 	{
 		RandomNumber -= (*it).m_Weight;
@@ -1040,7 +1195,7 @@ cEnchantments cEnchantments::SelectEnchantmentFromVector(const cWeightedEnchantm
 {
 	// Sum up all the enchantments' weights:
 	int AllWeights = 0;
-	for (const auto Enchantment : a_Enchantments)
+	for (const auto & Enchantment : a_Enchantments)
 	{
 		AllWeights += Enchantment.m_Weight;
 	}
@@ -1054,7 +1209,7 @@ cEnchantments cEnchantments::SelectEnchantmentFromVector(const cWeightedEnchantm
 	// Pick a random enchantment:
 	cNoise Noise(a_Seed);
 	int RandomNumber = Noise.IntNoise1DInt(AllWeights) / 7 % AllWeights;
-	for (const auto Enchantment : a_Enchantments)
+	for (const auto & Enchantment : a_Enchantments)
 	{
 		RandomNumber -= Enchantment.m_Weight;
 		if (RandomNumber <= 0)
